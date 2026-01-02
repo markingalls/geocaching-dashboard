@@ -263,9 +263,17 @@
       font-size:12px;
     }
 
-    .card, .metric, .pill, .small, .status {
+    .card, .metric, .small, .status, .table th, .table td, #caption {
       overflow-wrap: anywhere;
       word-break: break-word;
+    }
+
+    .pill{
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.25;
+      max-width: 100%;
     }
 
     .placesShort {
@@ -276,19 +284,10 @@
       min-width: 520px;
     }
 
-    .pilllist {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      flex-wrap: nowrap;
-      padding-bottom: 6px;
-    }
-    .pilllist .pill {
-      flex: 0 0 auto;
-    }
-
     @media (max-width: 520px){
       .section { padding: 18px; }
       .loader { padding: 12px; }
+      .metric .v{ font-size:30px; }
     }
   </style>
 </head>
@@ -813,7 +812,7 @@
           plugins:{legend:{display:false}},
           scales:{
             x:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Difficulty',color:'rgba(255,255,255,0.75)'}},
-            y:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Terrain',color:'rgba(255,255,255,0.75)'}}
+            y:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Terrain',color:'rgba(255,255,255,0.75)'}},
           }
         }
       });
