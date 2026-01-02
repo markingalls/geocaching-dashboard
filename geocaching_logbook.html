@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Geocaching Logbook</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+    :root{
+      --bg:#07140e;
+      --card:rgba(255,255,255,0.06);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.68);
+      --shadow:0 18px 45px rgba(0,0,0,0.35);
+      --radius:24px;
+      --border:rgba(255,255,255,0.10);
+    }
+    html,body{
+      margin:0;
+      background:
+        radial-gradient(1100px 760px at 12% 12%, rgba(34,197,94,0.16), transparent 55%),
+        radial-gradient(980px 720px at 88% 18%, rgba(16,185,129,0.14), transparent 60%),
+        radial-gradient(980px 920px at 60% 92%, rgba(132,204,22,0.10), transparent 55%),
+        linear-gradient(180deg, rgba(3,12,8,1), rgba(7,20,14,1));
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 18px 60px;}
+    .loader{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+      border-radius:20px;
+      padding:14px 14px 12px;
+      box-shadow:var(--shadow);
+      display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+      position:relative;
+    }
+    .loader .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .loader .row.controls{width:100%;}
+    .loader input[type=file], .loader input[type=text], .loader select{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.14);
+      color:var(--text);
+      padding:9px 10px;border-radius:12px;
+      outline:none;
+    }
+    .loader input[type=text]{width:140px;}
+    .loader input[type=text].narrow{width:110px;}
+    .pill{
+      padding:8px 12px;border-radius:999px;
+      background:rgba(34,197,94,0.12);
+      border:1px solid rgba(34,197,94,0.22);
+      color:var(--text);font-size:13px;white-space:nowrap;
+    }
+    .status{color:var(--muted);font-size:13px;}
+    .section{
+      position:relative;
+      background:linear-gradient(180deg,var(--card),rgba(255,255,255,0.03));
+      border:1px solid var(--border);
+      box-shadow:var(--shadow);
+      border-radius:var(--radius);
+      padding:26px;
+      margin:20px 0;
+      overflow:hidden;
+    }
+    #s1,#s3{min-height:unset;}
+    .section::before{
+      content:"";
+      position:absolute;inset:-2px;
+      background:
+        radial-gradient(640px 420px at 18% 0%, rgba(34,197,94,0.14), transparent 62%),
+        radial-gradient(640px 420px at 82% 10%, rgba(16,185,129,0.12), transparent 66%);
+      pointer-events:none;
+    }
+    .section>*{position:relative;z-index:1;}
+    .title{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+    h1{font-size:44px;margin:0;letter-spacing:-0.02em;}
+    h2{font-size:28px;margin:0 0 10px 0;letter-spacing:-0.01em;}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:10px 14px;border-radius:999px;
+      background:rgba(34,197,94,0.12);
+      border:1px solid rgba(34,197,94,0.25);
+      color:var(--text);font-weight:700;
+    }
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:18px;}
+    .card{background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:18px;padding:16px;}
+    .metric{display:flex;flex-direction:column;gap:6px;}
+    .metric .k{font-size:13px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;}
+    .metric .v{font-size:34px;font-weight:800;letter-spacing:-0.02em;}
+    .metric .s{font-size:13px;color:var(--muted);}
+    .span-3{grid-column:span 3;}
+    .span-4{grid-column:span 4;}
+    .span-6{grid-column:span 6;}
+    .span-8{grid-column:span 8;}
+    .span-12{grid-column:span 12;}
+    @media (max-width:980px){
+      .span-3,.span-4,.span-6,.span-8{grid-column:span 12;}
+      h1{font-size:36px;}
+    }
+    canvas{width:100%!important;height:360px!important;}
+    .map{width:100%;height:560px;border-radius:18px;overflow:hidden;border:1px solid var(--border);}
+    .pilllist{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+    .table{width:100%;border-collapse:collapse;font-size:14px;overflow:hidden;border-radius:16px;}
+    .table th,.table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;}
+    .table th{text-align:left;color:rgba(255,255,255,0.85);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;background:rgba(255,255,255,0.04);}
+    .table tr:last-child td{border-bottom:none;}
+    .small{color:var(--muted);font-size:13px;}
+    .footer{margin-top:14px;color:var(--muted);font-size:12px;}
+    .btn{cursor:pointer;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:var(--text);border-radius:14px;padding:9px 12px;font-weight:750;}
+    .btn:hover{background:rgba(255,255,255,0.09);}
+    .triple{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+    @media (max-width:980px){.triple{grid-template-columns:1fr;}}
+    .placesShort{max-height:320px;overflow:auto;}
+
+    a.creatorLink{
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    a.creatorLink:visited{ color: inherit; }
+    a.creatorLink:hover,
+    a.creatorLink:active{ color: inherit; }
+
+    .modalBody a,
+    .modalBody a:visited,
+    .modalBody a:hover,
+    .modalBody a:active{
+      color: inherit;
+    }
+
+    .switchWrap{display:flex;align-items:center;gap:10px;}
+    .switchText{font-size:13px;color:var(--text);font-weight:700;white-space:nowrap;}
+    .switch{position:relative;width:54px;height:30px;flex:0 0 auto;}
+    .switch input{opacity:0;width:0;height:0;}
+    .slider{
+      position:absolute;inset:0;
+      background:rgba(255,255,255,0.12);
+      border:1px solid rgba(255,255,255,0.18);
+      border-radius:999px;
+      transition:0.18s ease;
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,0.10);
+    }
+    .slider:before{
+      content:"";
+      position:absolute;
+      height:24px;width:24px;
+      left:3px;top:2.5px;
+      background:rgba(255,255,255,0.88);
+      border-radius:50%;
+      transition:0.18s ease;
+    }
+    .switch input:checked + .slider{
+      background:rgba(34,197,94,0.20);
+      border-color:rgba(34,197,94,0.28);
+    }
+    .switch input:checked + .slider:before{ transform:translateX(24px); }
+
+    .pinDot{
+      width:10px;height:10px;border-radius:50%;
+      border:1px solid rgba(0,0,0,0.25);
+      box-shadow:none;
+    }
+
+    .infoBtn{
+      position:absolute;
+      right:12px;
+      bottom:12px;
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(255,255,255,0.07);
+      color:rgba(255,255,255,0.92);
+      font-weight:900;
+      line-height:1;
+      box-shadow:0 10px 26px rgba(0,0,0,0.25);
+      user-select:none;
+    }
+    .infoBtn:hover{ background:rgba(255,255,255,0.10); }
+    .infoBtn:active{ transform:translateY(1px); }
+    .infoBtn:focus{ outline:2px solid rgba(34,197,94,0.55); outline-offset:2px; }
+    .infoBtn svg{ display:block; }
+
+    .modalOverlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:9999;
+    }
+    .modalOverlay.open{ display:flex; }
+
+    .modal{
+      width:min(760px, 100%);
+      max-height:min(82vh, 900px);
+      overflow:auto;
+
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+      box-shadow:0 28px 70px rgba(0,0,0,0.55);
+      padding:18px;
+    }
+    .modalHeader{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .modalTitle{
+      font-size:18px;
+      font-weight:900;
+      letter-spacing:-0.01em;
+    }
+    .modalClose{
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      border-radius:12px;
+      padding:8px 10px;
+      font-weight:850;
+    }
+    .modalClose:hover{ background:rgba(255,255,255,0.10); }
+
+    .modalBody{
+      color:rgba(255,255,255,0.86);
+      font-size:14px;
+      line-height:1.55;
+    }
+    .modalBody h3{
+      margin:14px 0 6px;
+      font-size:14px;
+      color:rgba(255,255,255,0.92);
+      letter-spacing:0.02em;
+    }
+    .modalBody ul{ margin:6px 0 0 18px; padding:0; }
+    .modalBody li{ margin:6px 0; }
+    .modalBody code{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.12);
+      padding:2px 6px;
+      border-radius:8px;
+    }
+    .modalHint{
+      margin-top:12px;
+      color:rgba(255,255,255,0.65);
+      font-size:12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="loader" id="loader">
+      <div class="row" style="width:100%;justify-content:space-between;gap:12px;">
+        <div class="row">
+          <div class="switchWrap">
+            <div class="pill">Units</div>
+            <span class="switchText" id="unitLeft">Metric</span>
+            <label class="switch" title="Toggle metric/imperial">
+              <input id="unitToggle" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+            <span class="switchText" id="unitRight" style="opacity:.75;">Imperial</span>
+          </div>
+
+          <div class="pill">Username</div>
+          <input id="userName" type="text" placeholder="your_username" />
+
+          <div class="pill">UTC offset</div>
+          <input id="utcOffset" class="narrow" type="text" value="-08:00" />
+
+          <div class="pill">Year</div>
+          <select id="yearSelect"></select>
+
+          <div class="pill">Home longitude</div>
+          <input id="homeLon" class="narrow" type="text" value="-122.8" />
+        </div>
+
+        <div class="row">
+          <input id="fileInput" type="file" accept=".zip,.gpx,.xml" />
+          <div class="status" id="status">Waiting for file…</div>
+        </div>
+      </div>
+
+      <div class="row controls">
+        <button class="btn" onclick="fitMap()">Fit map to finds</button>
+      </div>
+
+      <!-- Info icon button (bottom-right of this loader) -->
+      <button class="infoBtn" id="infoBtn" type="button" aria-label="How to use this tool" title="How to use this tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M12 10v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Help modal -->
+    <div class="modalOverlay" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal">
+        <div class="modalHeader">
+          <div>
+            <div class="modalTitle" id="helpTitle">How to use the Geocaching Logbook</div>
+            <div class="small" style="margin-top:4px;">Generate a year summary from a Pocket Query (GPX / ZIP)</div>
+          </div>
+          <button class="modalClose" id="helpClose" type="button">Close</button>
+        </div>
+
+        <div class="modalBody">
+          <h3>1) Export your finds</h3>
+          <ul>
+            <li>From Geocaching.com, download a <a href="https://www.geocaching.com/pocket/"><b>Pocket Query</b></a> that includes your <b>found</b> caches. You will need to be a premium member to use this feature.</li>
+            <li>Use a <code>.zip</code> PQ (recommended) or a raw <code>.gpx</code>.</li>
+          </ul>
+
+          <h3>2) Load the file</h3>
+          <ul>
+            <li>Click <b>Choose File</b> and select your PQ <code>.zip</code> / <code>.gpx</code>.</li>
+            <li>The page reads it locally in your browser (nothing is uploaded).</li>
+          </ul>
+
+          <h3>3) Configure the basics</h3>
+          <ul>
+            <li><b>Units</b>: toggle Metric/Imperial.</li>
+            <li><b>Username</b>: optional, for the title/caption.</li>
+            <li><b>UTC offset</b>: ensures finds are grouped into the correct day. Example: <code>-08:00</code>.</li>
+            <li><b>Year</b>: choose which year to visualize.</li>
+            <li><b>Home longitude</b>: used for “furthest east/west from Home” and dateline-safe map plotting.</li>
+          </ul>
+
+          <h3>4) Explore</h3>
+          <ul>
+            <li><b>Fit map to finds</b> zooms to your selected-year finds.</li>
+            <li>Click any map dot for cache details.</li>
+            <li>Charts and tables update automatically when you change year/offset/units.</li>
+          </ul>
+
+          <h3>Notes</h3>
+          <ul>
+            <li>Some caches may be “locationless” (0,0) and won’t appear on the map.</li>
+            <li>If “Found it” logs aren’t detected, export a PQ that includes logs for found caches.</li>
+          </ul>
+
+          <div class="modalHint">Tip: Press <code>Esc</code> to close this window. Click outside to dismiss.</div>
+        </div>
+      </div>
+    </div>
+
+    <section class="section" id="s1">
+      <div class="title">
+        <div>
+          <h1 id="titleH1">Geocaching Logbook</h1>
+          <div class="small" id="subtitleLine">Load a file to generate your logbook.</div>
+        </div>
+        <div class="badge" id="badge">🧭 Load a Pocket Query</div>
+      </div>
+
+      <div class="grid">
+        <div class="card span-3 metric">
+          <div class="k">Total finds (<span id="yLabelA">—</span>)</div>
+          <div class="v" id="mTotal">—</div>
+          <div class="s">Across <span id="mDays">—</span> caching days</div>
+        </div>
+
+        <div class="card span-3 metric">
+          <div class="k">Countries</div>
+          <div class="v" id="mCountries">—</div>
+          <div class="s" id="mCountriesList">—</div>
+        </div>
+
+        <div class="card span-3 metric">
+          <div class="k">Regions (state/province)</div>
+          <div class="v" id="mRegions">—</div>
+          <div class="s" id="mTopRegion">—</div>
+        </div>
+
+        <div class="card span-3 metric">
+          <div class="k">Travel</div>
+          <div class="v" id="mTravel">—</div>
+          <div class="s" id="mBigTravelDay">—</div>
+        </div>
+
+        <div class="card span-6">
+          <h2 style="margin-bottom:6px;">Big moments</h2>
+          <div class="pilllist" id="momentPills"></div>
+        </div>
+
+        <div class="card span-6">
+          <h2 style="margin-bottom:6px;">Where you cached</h2>
+          <div class="triple">
+            <div class="card" style="background: rgba(255,255,255,0.04);">
+              <div class="small">Top countries</div>
+              <div class="pilllist" id="countryPills"></div>
+            </div>
+            <div class="card" style="background: rgba(255,255,255,0.04);">
+              <div class="small">Top regions</div>
+              <div class="pilllist" id="regionPills"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="s2">
+      <div class="title">
+        <h2>Activity & Style</h2>
+        <div class="badge">📈 Monthly + cache breakdown</div>
+      </div>
+
+      <div class="grid">
+        <div class="card span-8">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Finds by month (<span id="yLabelB">—</span>)</h2>
+          <canvas id="monthlyChart"></canvas>
+          <div class="small">Peak month: <b id="peakMonth">—</b></div>
+        </div>
+
+        <div class="card span-4">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Cache types</h2>
+          <canvas id="typeChart"></canvas>
+          <div class="small" id="typeNote">—</div>
+        </div>
+
+        <div class="card span-6">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Container sizes</h2>
+          <canvas id="containerChart"></canvas>
+          <div class="small" id="containerNote">—</div>
+        </div>
+
+        <div class="card span-6">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">D/T profile</h2>
+          <canvas id="dtChart"></canvas>
+          <div class="small">Average Difficulty/Terrain for selected year</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="s3">
+      <div class="title">
+        <h2><span id="yLabelC">—</span> Find Map</h2>
+        <div class="badge" id="mapBadge">🗺️ — total regions</div>
+      </div>
+
+      <div class="grid">
+        <div class="span-8">
+          <div class="map" id="map"></div>
+        </div>
+
+        <div class="card span-4">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Places list</h2>
+          <div class="placesShort">
+            <table class="table" id="placesTable">
+              <thead><tr><th>Country</th><th>Regions</th><th>Finds</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="s4">
+      <div class="title">
+        <h2>Highlights & Challenges</h2>
+        <div class="badge" id="extBadge">✨ — Extremes</div>
+      </div>
+
+      <div class="grid">
+        <div class="card span-6">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Busiest days (top 5)</h2>
+          <table class="table" id="topDaysTable">
+            <thead><tr><th>Date</th><th>Finds</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card span-6">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Toughest finds (top 5)</h2>
+          <table class="table" id="toughTable">
+            <thead><tr><th>Cache</th><th>D/T</th><th>Where</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card span-12">
+          <h2 style="font-size:20px;margin:0 0 10px 0;">Extremes & fun facts</h2>
+          <div class="pilllist" id="extremesPills"></div>
+        </div>
+
+        <div class="card span-12">
+          <h2 style="font-size:20px;margin:0 0 10px 0;"><span id="yLabelD">—</span> Summary</h2>
+          <div class="card" style="background: rgba(255,255,255,0.04);">
+            <div id="caption" style="font-size:18px;line-height:1.45;white-space:pre-wrap;">Load a file to generate a caption…</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const CREATOR = 'ingallswx';
+    const CREATOR_URL = 'https://www.geocaching.com/p/?u=' + encodeURIComponent(CREATOR);
+    const HOME = { name: 'Home', lat: 49.2827, lon: -122.8 };
+
+    const ISO2_BY_COUNTRY = {
+      "Canada":"CA","United States":"US","USA":"US","Mexico":"MX","Japan":"JP","South Korea":"KR","Korea":"KR",
+      "China":"CN","Taiwan":"TW","Hong Kong":"HK","Singapore":"SG","Philippines":"PH","Thailand":"TH","Vietnam":"VN",
+      "Indonesia":"ID","Malaysia":"MY","India":"IN","Australia":"AU","New Zealand":"NZ",
+      "United Kingdom":"GB","France":"FR","Germany":"DE","Netherlands":"NL","Belgium":"BE","Spain":"ES","Portugal":"PT",
+      "Italy":"IT","Switzerland":"CH","Austria":"AT","Norway":"NO","Sweden":"SE","Denmark":"DK","Finland":"FI",
+      "Iceland":"IS","Poland":"PL","Czech Republic":"CZ","Greece":"GR","Turkey":"TR","Israel":"IL","United Arab Emirates":"AE",
+      "Dominican Republic":"DO","Haiti":"HT","Cuba":"CU","Jamaica":"JM","Puerto Rico":"PR"
+    };
+
+    function flagFromISO2(iso2){
+      const s = String(iso2||'').trim().toUpperCase();
+      if(!/^[A-Z]{2}$/.test(s)) return '';
+      const A = 0x1F1E6;
+      const c1 = A + (s.charCodeAt(0) - 65);
+      const c2 = A + (s.charCodeAt(1) - 65);
+      return String.fromCodePoint(c1, c2);
+    }
+
+    let UNIT_SYSTEM = 'metric';
+    let RAW_FINDS_ALL = [];
+    let LAST_XML = null;
+
+    let charts = { monthly:null, types:null, containers:null, dt:null };
+    let map = null;
+    let markerLayer = null;
+    let CURRENT_POINTS = [];
+
+    function fmtInt(n){ return (n||0).toLocaleString(); }
+
+    function parseOffsetMinutes(s){
+      const str = String(s||'').trim();
+      const m = str.match(/^([+-])(\d{2}):(\d{2})$/);
+      if(!m) return null;
+      const sign = m[1] === '-' ? -1 : 1;
+      const hh = parseInt(m[2],10), mm = parseInt(m[3],10);
+      if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+      return sign * (hh*60 + mm);
+    }
+
+    function ymdFromDateWithOffset(dateObj, offsetMinutes){
+      const ms = dateObj.getTime();
+      const adj = ms + offsetMinutes*60000;
+      const d = new Date(adj);
+      const Y = d.getUTCFullYear();
+      const M = String(d.getUTCMonth()+1).padStart(2,'0');
+      const D = String(d.getUTCDate()).padStart(2,'0');
+      return `${Y}-${M}-${D}`;
+    }
+
+    function monthIndexFromYYYYMMDD(ymd){
+      const m = parseInt(ymd.slice(5,7),10);
+      return Number.isFinite(m) ? (m-1) : null;
+    }
+
+    function escapeHtml(s){
+      const str=String(s==null?'':s);
+      return str
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#039;');
+    }
+
+    function haversineMeters(lat1,lon1,lat2,lon2){
+      const R=6371000;
+      const toRad=(x)=>x*Math.PI/180;
+      const dLat=toRad(lat2-lat1);
+      const dLon=toRad(lon2-lon1);
+      const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    }
+
+    function wrapDeltaLon(lon, refLon){
+      let d = lon - refLon;
+      d = ((d + 540) % 360) - 180;
+      return d;
+    }
+
+    function normalizeCountry(c){
+      const s = String(c||'').trim();
+      return s || 'Unknown';
+    }
+
+    function normalizeState(country, state){
+      const raw = String(state||'').trim();
+      const lc = raw.toLowerCase();
+      if(!raw || lc === 'none' || lc === 'null' || lc === 'n/a' || lc === 'unknown') return '';
+      if(lc === normalizeCountry(country).toLowerCase()) return '';
+      return raw;
+    }
+
+    function regionDisplay(country, state){
+      const c = normalizeCountry(country);
+      const s = normalizeState(c, state);
+      return s ? s : c;
+    }
+
+    function countryFlag(country){
+      const c = normalizeCountry(country);
+      const iso2 = ISO2_BY_COUNTRY[c];
+      return iso2 ? flagFromISO2(iso2) : '';
+    }
+
+    function fmtDistance(meters){
+      if(!Number.isFinite(meters)) return '—';
+      if(UNIT_SYSTEM === 'imperial'){
+        const miles = meters / 1609.344;
+        const dec = miles < 100 ? 1 : 0;
+        return miles.toLocaleString(undefined,{maximumFractionDigits:dec}) + ' mi';
+      }
+      const km = meters / 1000;
+      const dec = km < 100 ? 1 : 0;
+      return km.toLocaleString(undefined,{maximumFractionDigits:dec}) + ' km';
+    }
+
+    function fmtElevation(m){
+      if(!Number.isFinite(m)) return '—';
+      if(UNIT_SYSTEM === 'imperial'){
+        return Math.round(m * 3.28084).toLocaleString() + ' ft';
+      }
+      return Math.round(m).toLocaleString() + ' m';
+    }
+
+    function firstByLocalName(parent, local){
+      if(!parent) return null;
+      const all=parent.getElementsByTagName('*');
+      for(const el of all){ if(el.localName===local) return el; }
+      return null;
+    }
+    function textOf(el, fallback){
+      const t = el && el.textContent ? el.textContent.trim() : '';
+      return t ? t : (fallback || '');
+    }
+
+    function setStatus(msg){ document.getElementById('status').textContent = msg; }
+
+    function getSelectedYear(){
+      const y = parseInt(document.getElementById('yearSelect').value, 10);
+      return Number.isFinite(y) ? y : null;
+    }
+
+    function getOffsetMinutes(){
+      const m = parseOffsetMinutes(document.getElementById('utcOffset').value);
+      return (m == null) ? -480 : m;
+    }
+
+    function getHomeLon(){
+      const v = parseFloat(document.getElementById('homeLon').value);
+      return Number.isFinite(v) ? v : -122.8;
+    }
+
+    function getUsername(){
+      const s = String(document.getElementById('userName').value || '').trim();
+      return s;
+    }
+
+    function isLocationless(lat, lon){
+      if(!Number.isFinite(lat) || !Number.isFinite(lon)) return true;
+      if(Math.abs(lat) < 1e-10 && Math.abs(lon) < 1e-10) return true;
+      return false;
+    }
+
+    function adjustLonForDateline(lon, centerLon){
+      let x = lon;
+      while (x - centerLon > 180) x -= 360;
+      while (x - centerLon < -180) x += 360;
+      return x;
+    }
+
+    function populateYearsFromFinds(finds){
+      const years = Array.from(new Set(finds.map(f=>f.year))).sort((a,b)=>a-b);
+      const sel = document.getElementById('yearSelect');
+      sel.innerHTML = '';
+      for(const y of years){
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        sel.appendChild(opt);
+      }
+      const preferred = years.includes(2025) ? 2025 : (years[years.length-1] || 2025);
+      sel.value = String(preferred);
+    }
+
+    function buildTitleLines(mostRecentYMD){
+      const y = getSelectedYear();
+      const username = getUsername();
+
+      document.title = `${y} Geocaching Logbook`;
+      if(username){
+        document.getElementById('titleH1').textContent = `${y} Geocaching Logbook for ${username}`;
+      }else{
+        document.getElementById('titleH1').textContent = `${y} Geocaching Logbook`;
+      }
+
+      const line = document.getElementById('subtitleLine');
+      const safeDate = mostRecentYMD ? escapeHtml(mostRecentYMD) : '—';
+      line.innerHTML = `Most recent find included <b>${safeDate}</b> &nbsp;•&nbsp; Created by: <a class="creatorLink" href="${CREATOR_URL}" target="_blank" rel="noopener">${escapeHtml(CREATOR)}</a>`;
+
+      document.getElementById('yLabelA').textContent = y;
+      document.getElementById('yLabelB').textContent = y;
+      document.getElementById('yLabelC').textContent = y;
+      document.getElementById('yLabelD').textContent = y;
+
+      document.getElementById('extBadge').textContent = `✨ ${y} Extremes`;
+    }
+
+    function destroyChart(k){ if(charts[k]){ charts[k].destroy(); charts[k]=null; } }
+
+    function renderCharts(stats){
+      destroyChart('monthly'); destroyChart('types'); destroyChart('containers'); destroyChart('dt');
+
+      const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      charts.monthly = new Chart(document.getElementById('monthlyChart'),{
+        type:'bar',
+        data:{labels:monthNames,datasets:[{label:'Finds',data:stats.monthly,borderWidth:0,borderRadius:10}]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{legend:{display:false}},
+          scales:{
+            x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.75)'}},
+            y:{grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'}}
+          }
+        }
+      });
+
+      const peakI = stats.monthly.reduce((best,v,i)=>(v>stats.monthly[best]?i:best),0);
+      document.getElementById('peakMonth').textContent = monthNames[peakI]+' ('+stats.monthly[peakI]+' finds)';
+
+      function topN(map,n){ return Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0,n); }
+
+      const typeTop=topN(stats.typeMap,10);
+      charts.types=new Chart(document.getElementById('typeChart'),{
+        type:'doughnut',
+        data:{labels:typeTop.map(x=>x[0]),datasets:[{data:typeTop.map(x=>x[1]),borderWidth:0}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'rgba(255,255,255,0.80)'}}}}
+      });
+      document.getElementById('typeNote').textContent='Distinct types: '+stats.typeMap.size;
+
+      const contTop=topN(stats.containerMap,10);
+      charts.containers=new Chart(document.getElementById('containerChart'),{
+        type:'doughnut',
+        data:{labels:contTop.map(x=>x[0]),datasets:[{data:contTop.map(x=>x[1]),borderWidth:0}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'rgba(255,255,255,0.80)'}}}}
+      });
+      document.getElementById('containerNote').textContent=stats.topContainer?('Most common: '+stats.topContainer[0]+' ('+stats.topContainer[1]+')'):'—';
+
+      const dt=stats.allPoints.map(p=>({x:p.difficulty,y:p.terrain})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
+      charts.dt=new Chart(document.getElementById('dtChart'),{
+        type:'scatter',
+        data:{datasets:[{label:'Finds',data:dt}]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false}},
+          scales:{
+            x:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Difficulty',color:'rgba(255,255,255,0.75)'}},
+            y:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Terrain',color:'rgba(255,255,255,0.75)'}}
+          }
+        }
+      });
+    }
+
+    function renderPlacesTable(countrySummary){
+      const tbody=document.querySelector('#placesTable tbody');
+      tbody.innerHTML='';
+
+      const MAX_REGION_CHARS = 140;
+      const LONG_REGION_COUNT_CUTOFF = 14;
+
+      for(const c of countrySummary){
+        const allSubs = (c.subdivisions||[]).slice().sort((a,b)=>b.count-a.count);
+        const allNames = allSubs.map(s=>{
+          const rd = regionDisplay(c.country, s.name);
+          return rd + ' (' + s.count + ')';
+        });
+
+        let regionsText = allNames.join(', ');
+
+        if(regionsText.length > MAX_REGION_CHARS || allNames.length > LONG_REGION_COUNT_CUTOFF){
+          const top = allNames.slice(0,5).join(', ');
+          regionsText = top + (allNames.length > 5 ? `, +${allNames.length-5} more` : '');
+        }
+
+        const f = countryFlag(c.country);
+        const tr=document.createElement('tr');
+        tr.innerHTML =
+          '<td><b>'+(f?f+' ':'')+escapeHtml(c.country)+'</b></td>'+
+          '<td>'+escapeHtml(regionsText||'—')+'</td>'+
+          '<td><b>'+fmtInt(c.count)+'</b></td>';
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderTopDays(topDays){
+      const tbody=document.querySelector('#topDaysTable tbody');
+      tbody.innerHTML='';
+      topDays.slice(0,5).forEach(d=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML='<td><b>'+escapeHtml(d.date)+'</b></td><td>'+fmtInt(d.count)+'</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderTough(tough){
+      const tbody=document.querySelector('#toughTable tbody');
+      tbody.innerHTML='';
+      tough.slice(0,5).forEach(t=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML =
+          '<td><div style="font-weight:800;">'+escapeHtml(t.name)+'</div><div class="small">'+escapeHtml(t.code)+' · '+escapeHtml(t.date)+'</div></td>'+
+          '<td><b>'+t.d.toFixed(1)+' / '+t.t.toFixed(1)+'</b><div class="small">Σ='+t.dt.toFixed(1)+'</div></td>'+
+          '<td>'+escapeHtml(t.where)+'</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderExtremes(stats){
+      const el=document.getElementById('extremesPills');
+      el.innerHTML='';
+      const ex=stats.extremes;
+
+      function add(html){
+        const p=document.createElement('div');
+        p.className='pill';
+        p.innerHTML=html;
+        el.appendChild(p);
+      }
+
+      if(ex.furthestN) add('🧭 Furthest north: <b>'+ex.furthestN.lat.toFixed(3)+'°</b> — '+escapeHtml(ex.furthestN.name)+' ('+escapeHtml(regionDisplay(ex.furthestN.country, ex.furthestN.state))+')');
+      if(ex.furthestS) add('🧭 Furthest south: <b>'+ex.furthestS.lat.toFixed(3)+'°</b> — '+escapeHtml(ex.furthestS.name)+' ('+escapeHtml(regionDisplay(ex.furthestS.country, ex.furthestS.state))+')');
+
+      if(ex.furthestE) add('➡️ Furthest east (from Home): <b>'+ex.furthestE.lon.toFixed(3)+'°</b> — '+escapeHtml(ex.furthestE.name)+' ('+escapeHtml(regionDisplay(ex.furthestE.country, ex.furthestE.state))+')');
+      if(ex.furthestW) add('⬅️ Furthest west (from Home): <b>'+ex.furthestW.lon.toFixed(3)+'°</b> — '+escapeHtml(ex.furthestW.name)+' ('+escapeHtml(regionDisplay(ex.furthestW.country, ex.furthestW.state))+')');
+
+      if(ex.biggestDayDist && ex.biggestDayDist.date) add('🚗 Biggest single-day distance: <b>'+escapeHtml(fmtDistance(ex.biggestDayDist.meters))+'</b> ('+escapeHtml(ex.biggestDayDist.date)+')');
+
+      if(ex.highest) add('⛰️ Highest elevation: <b>'+escapeHtml(fmtElevation(ex.highest.elevationM))+'</b> — '+escapeHtml(ex.highest.name)+' ('+escapeHtml(regionDisplay(ex.highest.country, ex.highest.state))+')');
+      if(ex.lowest) add('🌊 Lowest elevation: <b>'+escapeHtml(fmtElevation(ex.lowest.elevationM))+'</b> — '+escapeHtml(ex.lowest.name)+' ('+escapeHtml(regionDisplay(ex.lowest.country, ex.lowest.state))+')');
+    }
+
+    function renderCaption(stats, peakMonthName){
+      const y = getSelectedYear();
+      const username = getUsername();
+      const topCountry = stats.topCountries && stats.topCountries[0] ? stats.topCountries[0] : null;
+      const topCountryTxt = topCountry ? `${topCountry.country} (${topCountry.count})` : '—';
+      const header = username ? `📓 ${y} Geocaching Logbook for ${username}` : `📓 ${y} Geocaching Logbook`;
+      const lines = [
+        header,
+        `• ${fmtInt(stats.total)} finds across ${fmtInt(stats.days)} days`,
+        `• Top country: ${topCountryTxt}`,
+        `• Peak month: ${peakMonthName}`,
+        `• Longest streak: ${stats.bestStreak.len} days (${stats.bestStreak.start} → ${stats.bestStreak.end})`,
+        `• Travel (as the crow flies): ${fmtDistance(stats.travelMeters)}`
+      ];
+      document.getElementById('caption').textContent = lines.join('\n');
+    }
+
+    function cacheTypeColor(cacheType){
+      const t = String(cacheType||'').toLowerCase();
+
+      if(t.includes('traditional')) return '#00884e';
+      if(t.includes('multi')) return '#e88524';
+      if(t.includes('earthcache') || t.includes('earth cache')) return '#a0d3df';
+      if(t.includes('webcam') || t.includes('virtual')) return '#089cbc';
+      if(t.includes('lab cache') || t.includes('lab')) return '#d1edef';
+
+      if(t.includes('project ape')) return '#151515';
+      if(t.includes('gps adventures exhibit')) return '#90191c';
+      if(t.includes('geocaching hq')) return '#fac341';
+
+      const isEvent =
+        t.includes('event') ||
+        t.includes('cito') ||
+        t.includes('mega') ||
+        t.includes('giga') ||
+        t.includes('community celebration') ||
+        t.includes('block party') ||
+        t.includes('celebration');
+      if(isEvent) return '#90191c';
+
+      if(t.includes('mystery') || t.includes('unknown') || t.includes('letterbox') || t.includes('wherigo')) return '#13518d';
+
+      return '#13518d';
+    }
+
+    function makeDotIcon(color){
+      const html = `<div class="pinDot" style="background:${escapeHtml(color)};"></div>`;
+      return L.divIcon({
+        className: '',
+        html,
+        iconSize: [10,10],
+        iconAnchor: [5,5],
+        popupAnchor: [0,-6]
+      });
+    }
+
+    function renderMap(points){
+      CURRENT_POINTS = points;
+
+      if(!map){
+        map = L.map('map',{zoomControl:true, worldCopyJump:false});
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+      }
+
+      if(markerLayer) map.removeLayer(markerLayer);
+      markerLayer = L.layerGroup().addTo(map);
+
+      const centerLon = getHomeLon();
+
+      const iconCache = new Map();
+      function iconForType(cacheType){
+        const color = cacheTypeColor(cacheType);
+        if(!iconCache.has(color)) iconCache.set(color, makeDotIcon(color));
+        return iconCache.get(color);
+      }
+
+      for(const p of points){
+        const adjLon = adjustLonForDateline(p.lon, centerLon);
+        const popup =
+          '<div style="font-weight:800;font-size:14px;margin-bottom:4px;">'+escapeHtml(p.name)+'</div>'+
+          '<div style="opacity:.9;font-size:12px;">'+escapeHtml(p.code)+' · '+escapeHtml(p.cacheType)+'</div>'+
+          '<div style="opacity:.9;font-size:12px;margin-top:4px;">'+escapeHtml(regionDisplay(p.country, p.state))+', '+escapeHtml(normalizeCountry(p.country))+'</div>'+
+          '<div style="opacity:.9;font-size:12px;">Found: '+escapeHtml(p.ymd)+'</div>';
+
+        L.marker([p.lat, adjLon], { icon: iconForType(p.cacheType) }).bindPopup(popup).addTo(markerLayer);
+      }
+
+      fitMap();
+    }
+
+    function fitMap(){
+      if(!map || !CURRENT_POINTS.length) return;
+      const centerLon = getHomeLon();
+      const latlngs = CURRENT_POINTS.map(p=>[p.lat, adjustLonForDateline(p.lon, centerLon)]);
+      map.fitBounds(L.latLngBounds(latlngs).pad(0.15));
+    }
+
+    function computeStatsForYear(allFindsYear, locatedFindsYear, allFindsAllYears){
+      const total = allFindsYear.length;
+      const days = new Set(allFindsYear.map(f=>f.ymd)).size;
+
+      const monthly = Array(12).fill(0);
+      for(const f of allFindsYear){
+        const mi = monthIndexFromYYYYMMDD(f.ymd);
+        if(mi!=null) monthly[mi]+=1;
+      }
+
+      function countBy(list, fn){
+        const m = new Map();
+        for(const f of list){
+          const k = fn(f);
+          m.set(k,(m.get(k)||0)+1);
+        }
+        return m;
+      }
+
+      const typeMap = countBy(allFindsYear, f=>f.cacheType||'Unknown');
+      const containerMap = countBy(allFindsYear, f=>f.container||'Unknown');
+
+      const countryMap = countBy(locatedFindsYear, f=>normalizeCountry(f.country));
+      const regionMap  = countBy(locatedFindsYear, f=>normalizeCountry(f.country)+'::'+regionDisplay(f.country,f.state));
+
+      const countrySummary=[];
+      for(const [country,cCount] of Array.from(countryMap.entries()).sort((a,b)=>b[1]-a[1])){
+        const subMap = new Map();
+        for(const f of locatedFindsYear){
+          if(normalizeCountry(f.country)!==country) continue;
+          const r = regionDisplay(country, f.state);
+          subMap.set(r,(subMap.get(r)||0)+1);
+        }
+        const subs = Array.from(subMap.entries()).sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));
+        countrySummary.push({country,count:cCount,subdivisions:subs});
+      }
+
+      const regionsCount = new Set(locatedFindsYear.map(f=>normalizeCountry(f.country)+'::'+regionDisplay(f.country,f.state))).size;
+
+      const dVals = allFindsYear.map(f=>f.difficulty).filter(v=>Number.isFinite(v));
+      const tVals = allFindsYear.map(f=>f.terrain).filter(v=>Number.isFinite(v));
+      const avgD  = dVals.length ? dVals.reduce((a,b)=>a+b,0)/dVals.length : null;
+      const avgT  = tVals.length ? tVals.reduce((a,b)=>a+b,0)/tVals.length : null;
+
+      const sortedLocated = locatedFindsYear.slice().sort((a,b)=>{
+        const ta = a.timeMs ?? 0;
+        const tb = b.timeMs ?? 0;
+        if(ta!==tb) return ta-tb;
+        return (a.code||'').localeCompare(b.code||'');
+      });
+
+      let travelMeters = 0;
+      for(let i=1;i<sortedLocated.length;i++){
+        travelMeters += haversineMeters(sortedLocated[i-1].lat,sortedLocated[i-1].lon,sortedLocated[i].lat,sortedLocated[i].lon);
+      }
+
+      const dates = Array.from(new Set(allFindsYear.map(f=>f.ymd))).sort();
+      function dayNum(ymd){
+        const Y=parseInt(ymd.slice(0,4),10);
+        const M=parseInt(ymd.slice(5,7),10);
+        const D=parseInt(ymd.slice(8,10),10);
+        return Date.UTC(Y,M-1,D)/86400000;
+      }
+      let bestStreakLen = dates.length?1:0, bestStart = dates[0]||'—', bestEnd = dates[0]||'—';
+      let curLen = dates.length?1:0, curStart = dates[0]||'—';
+      for(let i=1;i<dates.length;i++){
+        const prev=dates[i-1], cur=dates[i];
+        if(dayNum(cur)===dayNum(prev)+1) curLen+=1;
+        else{
+          if(curLen>bestStreakLen){ bestStreakLen=curLen; bestStart=curStart; bestEnd=prev; }
+          curLen=1; curStart=cur;
+        }
+      }
+      if(curLen>bestStreakLen && dates.length){ bestStreakLen=curLen; bestStart=curStart; bestEnd=dates[dates.length-1]; }
+
+      const dayCounts = new Map();
+      for(const f of allFindsYear) dayCounts.set(f.ymd,(dayCounts.get(f.ymd)||0)+1);
+      const topDays = Array.from(dayCounts.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([date,count])=>({date,count}));
+
+      const tough = allFindsYear.map(f=>{
+        const dt=(Number.isFinite(f.difficulty)&&Number.isFinite(f.terrain))?(f.difficulty+f.terrain):-1;
+        return {code:f.code,name:f.name,d:f.difficulty,t:f.terrain,dt,where:regionDisplay(f.country,f.state)+', '+normalizeCountry(f.country),date:f.ymd};
+      }).filter(x=>x.dt>=0).sort((a,b)=>b.dt-a.dt).slice(0,5);
+
+      const topContainer = Array.from(containerMap.entries()).sort((a,b)=>b[1]-a[1])[0] || null;
+
+      const topCountries = Array.from(countryMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([country,count])=>({country,count}));
+      const topRegions = Array.from(regionMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([key,count])=>{
+        const [country,region] = key.split('::');
+        return {country, region, count};
+      });
+
+      const homeLon = getHomeLon();
+      let furthestN=null, furthestS=null, furthestE=null, furthestW=null, highest=null, lowest=null;
+
+      for(const f of locatedFindsYear){
+        if(!furthestN || f.lat>furthestN.lat) furthestN=f;
+        if(!furthestS || f.lat<furthestS.lat) furthestS=f;
+
+        const dLon = wrapDeltaLon(f.lon, homeLon);
+        if(!furthestE || dLon>furthestE._d) furthestE = Object.assign({_d:dLon}, f);
+        if(!furthestW || dLon<furthestW._d) furthestW = Object.assign({_d:dLon}, f);
+
+        if(Number.isFinite(f.elevationM)){
+          if(!highest || f.elevationM>highest.elevationM) highest=f;
+          if(!lowest  || f.elevationM<lowest.elevationM)  lowest=f;
+        }
+      }
+
+      const byDay = new Map();
+      for(const f of sortedLocated){
+        if(!byDay.has(f.ymd)) byDay.set(f.ymd,[]);
+        byDay.get(f.ymd).push(f);
+      }
+      let biggestDayDist = {date:null, meters:0};
+      for(const [date,list] of byDay.entries()){
+        let meters=0;
+        for(let i=1;i<list.length;i++){
+          meters += haversineMeters(list[i-1].lat,list[i-1].lon,list[i].lat,list[i].lon);
+        }
+        if(meters>biggestDayDist.meters) biggestDayDist={date, meters};
+      }
+
+      let biggestWeek = null;
+      if(dates.length){
+        const countsByDay = new Map(dayCounts);
+        let best = {start:null,end:null,count:0};
+        for(let i=0;i<dates.length;i++){
+          const start = dates[i];
+          let count = 0;
+          for(let k=0;k<7;k++){
+            const Y=parseInt(start.slice(0,4),10);
+            const M=parseInt(start.slice(5,7),10);
+            const D=parseInt(start.slice(8,10),10);
+            const dt = new Date(Date.UTC(Y,M-1,D) + k*86400000);
+            const ymd = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+            count += (countsByDay.get(ymd) || 0);
+          }
+          if(count > best.count){
+            const Y=parseInt(start.slice(0,4),10);
+            const M=parseInt(start.slice(5,7),10);
+            const D=parseInt(start.slice(8,10),10);
+            const endDt = new Date(Date.UTC(Y,M-1,D) + 6*86400000);
+            const end = `${endDt.getUTCFullYear()}-${String(endDt.getUTCMonth()+1).padStart(2,'0')}-${String(endDt.getUTCDate()).padStart(2,'0')}`;
+            best = {start, end, count};
+          }
+        }
+        biggestWeek = best.count > 0 ? best : null;
+      }
+
+      const milestones = [];
+      if(total >= 100){
+        const sortedAll = allFindsYear.slice().sort((a,b)=>{
+          const ta = a.timeMs ?? 0;
+          const tb = b.timeMs ?? 0;
+          if(ta!==tb) return ta-tb;
+          return (a.code||'').localeCompare(b.code||'');
+        });
+        for(let m=100; m<=total; m+=100){
+          const f = sortedAll[m-1];
+          if(f && f.ymd) milestones.push({n:m, date:f.ymd});
+        }
+      }
+
+      const grandTotal = allFindsAllYears.length;
+      const firstYear = allFindsAllYears.reduce((min,f)=>Math.min(min,f.year), Infinity);
+      const mostRecent = allFindsAllYears.reduce((max,f)=> (f.ymd > max ? f.ymd : max), '0000-00-00');
+
+      return {
+        total, days, monthly,
+        typeMap, containerMap, topContainer,
+        avgD, avgT,
+        travelMeters,
+        countrySummary,
+        regionsCount,
+        topCountries,
+        topRegions,
+        allPoints: allFindsYear,
+        locatedPoints: locatedFindsYear,
+        topDays,
+        tough,
+        bestStreak:{len:bestStreakLen,start:bestStart,end:bestEnd},
+        extremes:{
+          furthestN,furthestS,
+          furthestE:furthestE?{name:furthestE.name,country:furthestE.country,state:furthestE.state,lon:furthestE.lon}:null,
+          furthestW:furthestW?{name:furthestW.name,country:furthestW.country,state:furthestW.state,lon:furthestW.lon}:null,
+          highest,lowest,
+          biggestDayDist
+        },
+        biggestWeek,
+        milestones,
+        grandTotal,
+        firstYear: Number.isFinite(firstYear) ? firstYear : null,
+        mostRecent
+      };
+    }
+
+    function renderAll(stats){
+      const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+      buildTitleLines(stats.mostRecent);
+
+      document.getElementById('badge').textContent =
+        (stats.firstYear ? `🧭 ${fmtInt(stats.grandTotal)} finds since ${stats.firstYear}` : `🧭 ${fmtInt(stats.grandTotal)} finds`);
+
+      document.getElementById('mTotal').textContent = fmtInt(stats.total);
+      document.getElementById('mDays').textContent  = fmtInt(stats.days);
+
+      const topCountry = stats.topCountries && stats.topCountries[0] ? stats.topCountries[0] : null;
+      document.getElementById('mCountries').textContent = fmtInt(stats.topCountries.length);
+      if(topCountry){
+        const f = countryFlag(topCountry.country);
+        document.getElementById('mCountriesList').textContent = `${f ? f + ' ' : ''}${topCountry.country} (${topCountry.count})`;
+      }else{
+        document.getElementById('mCountriesList').textContent = '—';
+      }
+
+      document.getElementById('mRegions').textContent = fmtInt(stats.regionsCount);
+
+      const topRegion = stats.topRegions && stats.topRegions[0] ? stats.topRegions[0] : null;
+      if(topRegion){
+        const f = countryFlag(topRegion.country);
+        document.getElementById('mTopRegion').textContent = `${f?f+' ':''}${topRegion.region} (${topRegion.count})`;
+      }else{
+        document.getElementById('mTopRegion').textContent = '—';
+      }
+
+      document.getElementById('mTravel').textContent = fmtDistance(stats.travelMeters);
+      const bd = stats.extremes && stats.extremes.biggestDayDist;
+      document.getElementById('mBigTravelDay').textContent =
+        (bd && bd.date) ? (`Biggest travel day: ${bd.date} (${fmtDistance(bd.meters)})`) : 'Biggest travel day: —';
+
+      const moments=document.getElementById('momentPills');
+      moments.innerHTML='';
+      const peakMonthI = stats.monthly.reduce((best,v,i)=> (v>stats.monthly[best]?i:best), 0);
+      const bigDay = stats.topDays && stats.topDays[0] ? stats.topDays[0] : null;
+
+      const items = [];
+      if(stats.bestStreak.len) items.push(`🔥 Longest streak: <b>${stats.bestStreak.len}</b> days (${stats.bestStreak.start} → ${stats.bestStreak.end})`);
+      if(bigDay) items.push(`📅 Biggest day: <b>${bigDay.count}</b> finds (${bigDay.date})`);
+      items.push(`📈 Peak month: <b>${monthNames[peakMonthI]}</b> (${stats.monthly[peakMonthI]})`);
+      if(stats.biggestWeek && stats.biggestWeek.count>0) items.push(`🗓️ Biggest week: <b>${stats.biggestWeek.count}</b> finds (${stats.biggestWeek.start} → ${stats.biggestWeek.end})`);
+      if(stats.avgD && stats.avgT) items.push(`🎯 Avg D/T: <b>${stats.avgD.toFixed(2)}</b> / <b>${stats.avgT.toFixed(2)}</b>`);
+      if(stats.milestones && stats.milestones.length){
+        for(const m of stats.milestones){
+          items.push(`🏁 ${m.n}th find on <b>${m.date}</b>`);
+        }
+      }
+
+      for(const html of items){
+        const p=document.createElement('div');
+        p.className='pill';
+        p.innerHTML=html;
+        moments.appendChild(p);
+      }
+
+      const cPills=document.getElementById('countryPills');
+      cPills.innerHTML='';
+      (stats.topCountries||[]).slice(0,5).forEach(c=>{
+        const pill=document.createElement('div');
+        pill.className='pill';
+        const f = countryFlag(c.country);
+        pill.innerHTML = `<b>${f?f+' ':''}${escapeHtml(c.country)}</b> · ${fmtInt(c.count)} finds`;
+        cPills.appendChild(pill);
+      });
+
+      const rPills=document.getElementById('regionPills');
+      rPills.innerHTML='';
+      (stats.topRegions||[]).slice(0,5).forEach(r=>{
+        const pill=document.createElement('div');
+        pill.className='pill';
+        const f = countryFlag(r.country);
+        pill.innerHTML = `<b>${f?f+' ':''}${escapeHtml(r.region)}</b> · ${fmtInt(r.count)} finds`;
+        rPills.appendChild(pill);
+      });
+
+      renderCharts(stats);
+      renderMap(stats.locatedPoints);
+      document.getElementById('mapBadge').textContent = `🗺️ ${fmtInt(stats.regionsCount)} total regions`;
+      renderPlacesTable(stats.countrySummary);
+      renderTopDays(stats.topDays);
+      renderTough(stats.tough);
+      renderExtremes(stats);
+      renderCaption(stats, monthNames[peakMonthI]);
+    }
+
+    function rerenderIfReady(){
+      if(!RAW_FINDS_ALL.length) return;
+      recomputeAndRender();
+    }
+
+    function recomputeAndRender(){
+      const y = getSelectedYear();
+      if(!y) return;
+      HOME.lon = getHomeLon();
+      const allFindsYear = RAW_FINDS_ALL.filter(f=>f.year===y);
+      const locatedFindsYear = allFindsYear.filter(f=>!f.locationless);
+      const stats = computeStatsForYear(allFindsYear, locatedFindsYear, RAW_FINDS_ALL);
+      renderAll(stats);
+    }
+
+    function parseFindsFromGpx(xml){
+      const offsetMinutes = getOffsetMinutes();
+      const wpts = Array.from(xml.getElementsByTagName('wpt'));
+      const finds = [];
+
+      for(const wpt of wpts){
+        const lat = parseFloat(wpt.getAttribute('lat'));
+        const lon = parseFloat(wpt.getAttribute('lon'));
+
+        const ele = parseFloat(textOf(firstByLocalName(wpt,'ele'),'NaN'));
+        const elevationM = Number.isFinite(ele)?ele:null;
+
+        const code = textOf(firstByLocalName(wpt,'name'),'');
+        const gsCache = firstByLocalName(wpt,'cache');
+        if(!gsCache) continue;
+
+        const cacheName =
+          textOf(firstByLocalName(gsCache,'name'),'') ||
+          textOf(firstByLocalName(wpt,'desc'),'') ||
+          code || 'Cache';
+
+        const cacheType = textOf(firstByLocalName(gsCache,'type'),'Unknown');
+        const container = textOf(firstByLocalName(gsCache,'container'),'Unknown');
+        const difficulty = parseFloat(textOf(firstByLocalName(gsCache,'difficulty'),'NaN'));
+        const terrain = parseFloat(textOf(firstByLocalName(gsCache,'terrain'),'NaN'));
+        const country = normalizeCountry(textOf(firstByLocalName(gsCache,'country'),'Unknown'));
+        const state = textOf(firstByLocalName(gsCache,'state'),'');
+
+        let foundIso = null;
+        let foundMs = null;
+
+        const logsEl = firstByLocalName(gsCache,'logs');
+        if(logsEl){
+          const logs = Array.from(logsEl.getElementsByTagName('*')).filter(el=>el.localName==='log');
+          for(const log of logs){
+            const logType = textOf(firstByLocalName(log,'type'),'').toLowerCase();
+            if(logType.indexOf('found')===-1) continue;
+            const dateIso = textOf(firstByLocalName(log,'date'),'');
+            const d = new Date(dateIso);
+            if(!Number.isNaN(d.getTime())){
+              foundIso = dateIso;
+              foundMs = d.getTime();
+              break;
+            }
+          }
+        }
+
+        if(!foundIso){
+          const timeText = textOf(firstByLocalName(wpt,'time'),'');
+          const d = new Date(timeText);
+          if(!Number.isNaN(d.getTime())){
+            foundIso = timeText;
+            foundMs = d.getTime();
+          }
+        }
+
+        if(!foundIso || foundMs == null) continue;
+
+        const ymd = ymdFromDateWithOffset(new Date(foundMs), offsetMinutes);
+        const year = parseInt(ymd.slice(0,4),10);
+        if(!Number.isFinite(year)) continue;
+
+        const locationless = isLocationless(lat, lon);
+
+        finds.push({
+          lat, lon, elevationM, locationless,
+          code,
+          name: cacheName,
+          cacheType,
+          container,
+          difficulty: Number.isFinite(difficulty)?difficulty:null,
+          terrain: Number.isFinite(terrain)?terrain:null,
+          country,
+          state,
+          ymd,
+          year,
+          timeMs: foundMs
+        });
+      }
+
+      finds.sort((a,b)=>{
+        if(a.timeMs!==b.timeMs) return a.timeMs-b.timeMs;
+        return (a.code||'').localeCompare(b.code||'');
+      });
+
+      return finds;
+    }
+
+    async function loadFile(file){
+      setStatus('Reading '+file.name+'…');
+      const buf = await file.arrayBuffer();
+
+      let gpxText = null;
+      const lower = file.name.toLowerCase();
+
+      if(lower.endsWith('.zip')){
+        const zip = await JSZip.loadAsync(buf);
+        const gpxFiles = [];
+        zip.forEach((path, entry)=>{
+          if(entry.dir) return;
+          if(path.toLowerCase().endsWith('.gpx')) gpxFiles.push(path);
+        });
+        if(!gpxFiles.length) throw new Error('No GPX files found in zip');
+
+        let bestPath=gpxFiles[0], bestSize=-1, bestContent=null;
+        for(const p of gpxFiles){
+          const content = await zip.file(p).async('string');
+          if(content.length>bestSize){ bestSize=content.length; bestPath=p; bestContent=content; }
+        }
+        gpxText = bestContent;
+        setStatus('Loaded '+bestPath);
+      }else{
+        gpxText = new TextDecoder('utf-8').decode(buf);
+        setStatus('Loaded GPX');
+      }
+
+      if(!gpxText || gpxText.indexOf('<gpx')===-1) throw new Error('File did not look like a GPX');
+      const xml = new DOMParser().parseFromString(gpxText,'text/xml');
+      const parserError = xml.getElementsByTagName('parsererror');
+      if(parserError && parserError.length) throw new Error('GPX XML parse error');
+
+      LAST_XML = xml;
+      RAW_FINDS_ALL = parseFindsFromGpx(xml);
+
+      if(!RAW_FINDS_ALL.length){
+        document.getElementById('badge').textContent='⚠️ No Found logs detected';
+        document.getElementById('caption').textContent='I loaded a GPX, but did not detect Found it logs. Try exporting a PQ that includes found caches with logs.';
+        return;
+      }
+
+      populateYearsFromFinds(RAW_FINDS_ALL);
+      recomputeAndRender();
+      setStatus('Done ✅');
+    }
+
+    document.getElementById('fileInput').addEventListener('change', async (ev)=>{
+      const file = ev.target.files && ev.target.files[0];
+      if(!file) return;
+      try{
+        await loadFile(file);
+      }catch(e){
+        console.error(e);
+        setStatus('Error: '+(e && e.message ? e.message : e));
+        alert('Could not load file.\n\n'+(e && e.message ? e.message : e));
+      }
+    });
+
+    const unitToggle = document.getElementById('unitToggle');
+    function syncUnitUI(){
+      const on = unitToggle.checked;
+      UNIT_SYSTEM = on ? 'imperial' : 'metric';
+      document.getElementById('unitLeft').style.opacity = on ? 0.75 : 1;
+      document.getElementById('unitRight').style.opacity = on ? 1 : 0.75;
+    }
+    unitToggle.addEventListener('change', ()=>{
+      syncUnitUI();
+      rerenderIfReady();
+    });
+    syncUnitUI();
+
+    document.getElementById('utcOffset').addEventListener('change', ()=>{
+      if(!LAST_XML) return;
+      RAW_FINDS_ALL = parseFindsFromGpx(LAST_XML);
+      populateYearsFromFinds(RAW_FINDS_ALL);
+      recomputeAndRender();
+    });
+
+    document.getElementById('yearSelect').addEventListener('change', ()=>{
+      recomputeAndRender();
+    });
+
+    document.getElementById('homeLon').addEventListener('change', ()=>{
+      recomputeAndRender();
+    });
+
+    document.getElementById('userName').addEventListener('change', ()=>{
+      rerenderIfReady();
+    });
+
+    (function initMapPlaceholder(){
+      map = L.map('map',{zoomControl:true, worldCopyJump:false}).setView([20,0],2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+    })();
+
+    // --- Help modal wiring ---
+    (function initHelpModal(){
+      const btn = document.getElementById('infoBtn');
+      const overlay = document.getElementById('helpModal');
+      const closeBtn = document.getElementById('helpClose');
+
+      if(!btn || !overlay || !closeBtn) return;
+
+      let lastFocus = null;
+
+      function open(){
+        lastFocus = document.activeElement;
+        overlay.classList.add('open');
+        closeBtn.focus();
+      }
+
+      function close(){
+        overlay.classList.remove('open');
+        if(lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+      }
+
+      btn.addEventListener('click', open);
+      closeBtn.addEventListener('click', close);
+
+      // click outside modal closes
+      overlay.addEventListener('click', (e)=>{
+        if(e.target === overlay) close();
+      });
+
+      // ESC closes
+      window.addEventListener('keydown', (e)=>{
+        if(e.key === 'Escape' && overlay.classList.contains('open')) close();
+      });
+    })();
+  </script>
+</body>
+</html>
