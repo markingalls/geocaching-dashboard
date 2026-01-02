@@ -282,14 +282,68 @@
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
+
+    /* IMPORTANT CHANGE:
+       Don't force desktop tables wider than their container.
+       (Mobile can still set a min-width inside the mobile media query below.) */
     .table {
-      min-width: 520px;
+      min-width: 0;
+    }
+
+    /* -----------------------------
+       Places list (desktop/tablet) sizing:
+       - Country: wrap at spaces, but NEVER break inside words (fixes "COUNTR / Y")
+       - Regions: narrower and wrap freely
+       - Finds: always visible, right-aligned, no wrap
+    ------------------------------*/
+    #placesTable{
+      table-layout: fixed;
+      width: 100%;
+    }
+
+    /* Keep headers tidy (don't wrap COUNTRY/REGIONS/FINDs) */
+    #placesTable th{
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    /* Country column: enough width for "🇨🇦 Canada" and "🇺🇸 United States" (wrap between words) */
+    #placesTable th:nth-child(1),
+    #placesTable td:nth-child(1){
+      width: 34%;
+      white-space: normal;     /* allow "United States" to wrap */
+      word-break: normal;      /* prevent "COUNTR / Y" */
+      overflow-wrap: normal;   /* prevent breaking inside words */
+    }
+
+    /* Regions column: allow wrapping (your preferred behavior) */
+    #placesTable th:nth-child(2),
+    #placesTable td:nth-child(2){
+      width: 50%;
+      white-space: normal;
+      word-break: break-word;   /* ok to wrap long region strings */
+      overflow-wrap: anywhere;  /* ok to wrap aggressively here */
+    }
+
+    /* Finds column: always visible */
+    #placesTable th:nth-child(3),
+    #placesTable td:nth-child(3){
+      width: 16%;
+      text-align: right;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
     }
 
     @media (max-width: 520px){
       .section { padding: 18px; }
       .loader { padding: 12px; }
       .metric .v{ font-size:30px; }
+
+      .table {
+        min-width: 520px;
+      }
 
       #placesTable{ table-layout: fixed; }
       #placesTable th:nth-child(1), #placesTable td:nth-child(1){
