@@ -93,11 +93,13 @@
     .metric .s{font-size:13px;color:var(--muted);}
     .span-3{grid-column:span 3;}
     .span-4{grid-column:span 4;}
+    .span-5{grid-column:span 5;}
     .span-6{grid-column:span 6;}
+    .span-7{grid-column:span 7;}
     .span-8{grid-column:span 8;}
     .span-12{grid-column:span 12;}
     @media (max-width:980px){
-      .span-3,.span-4,.span-6,.span-8{grid-column:span 12;}
+      .span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12;}
       h1{font-size:36px;}
     }
     canvas{width:100%!important;height:360px!important;}
@@ -514,11 +516,11 @@
       </div>
 
       <div class="grid">
-        <div class="span-8">
+        <div class="span-7">
           <div class="map" id="map"></div>
         </div>
 
-        <div class="card span-4">
+        <div class="card span-5">
           <h2 style="font-size:20px;margin:0 0 10px 0;">Places list</h2>
           <div class="placesShort">
             <table class="table" id="placesTable">
@@ -834,7 +836,7 @@
           plugins:{legend:{display:false}},
           scales:{
             x:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Difficulty',color:'rgba(255,255,255,0.75)'}},
-            y:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Terrain',color:'rgba(255,255,255,0.75)'}},
+            y:{min:1,max:5,grid:{color:'rgba(255,255,255,0.08)'},ticks:{color:'rgba(255,255,255,0.75)'},title:{display:true,text:'Terrain',color:'rgba(255,255,255,0.75)'}}
           }
         }
       });
