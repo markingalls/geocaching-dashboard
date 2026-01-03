@@ -115,7 +115,8 @@
     .btn:hover{background:rgba(255,255,255,0.09);}
     .triple{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
     @media (max-width:980px){.triple{grid-template-columns:1fr;}}
-    .placesShort{max-height:320px;overflow:auto;}
+    .card.span-5{display:flex;flex-direction:column;}
+    .card.span-5 .placesShort{flex:1;min-height:0;overflow:auto;max-height:none;}
 
     a.creatorLink{
       color: inherit;
@@ -633,17 +634,76 @@
     const CREATOR_URL = 'https://www.geocaching.com/p/?u=' + encodeURIComponent(CREATOR);
     const HOME = { name: 'Home', lat: 49.2827, lon: -122.8 };
 
-    const ISO2_BY_COUNTRY = {
-      "Canada":"CA","United States":"US","USA":"US","Mexico":"MX","Japan":"JP","South Korea":"KR","Korea":"KR",
-      "China":"CN","Taiwan":"TW","Hong Kong":"HK","Singapore":"SG","Philippines":"PH","Thailand":"TH","Vietnam":"VN",
-      "Indonesia":"ID","Malaysia":"MY","India":"IN","Australia":"AU","New Zealand":"NZ",
-      "United Kingdom":"GB","France":"FR","Germany":"DE","Netherlands":"NL","Belgium":"BE","Spain":"ES","Portugal":"PT",
-      "Italy":"IT","Switzerland":"CH","Austria":"AT","Norway":"NO","Sweden":"SE","Denmark":"DK","Finland":"FI",
-      "Iceland":"IS","Poland":"PL","Czech Republic":"CZ","Greece":"GR","Turkey":"TR","Israel":"IL","United Arab Emirates":"AE",
-      "Dominican Republic":"DO","Haiti":"HT","Cuba":"CU","Jamaica":"JM","Puerto Rico":"PR"
-    };
-
-    function flagFromISO2(iso2){
+    const ISO2_BY_COUNTRY = (function(){
+  const norm = s => String(s||'').trim().toLowerCase().replace(/[\u2019']/g,"'").replace(/[^a-z0-9]+/g,' ').trim();
+  const map = Object.create(null);
+  const add = (name, code) => {
+    if(!name || !code) return;
+    map[norm(name)] = code;
+  };
+  const codes = "AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,SS,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW,XK,EU,UN".split(',');
+  let dnEn = null;
+  let dnLocal = null;
+  if(typeof Intl !== 'undefined' && Intl.DisplayNames){
+    try{ dnEn = new Intl.DisplayNames(['en'],{type:'region'}); }catch(e){}
+    try{ dnLocal = new Intl.DisplayNames([navigator.language||'en'],{type:'region'}); }catch(e){}
+  }
+  for(const code of codes){
+    add(code, code);
+    if(dnEn){ const n = dnEn.of(code); if(n) add(n, code); }
+    if(dnLocal){ const n = dnLocal.of(code); if(n) add(n, code); }
+  }
+  add('United States','US'); add('USA','US'); add('U.S.A.','US'); add('United States of America','US');
+  add('United Kingdom','GB'); add('UK','GB'); add('Great Britain','GB'); add('Britain','GB');
+  add('Russia','RU'); add('Russian Federation','RU');
+  add('South Korea','KR'); add('Korea, Republic of','KR');
+  add('North Korea','KP'); add("Korea, Democratic People's Republic of",'KP');
+  add('Czech Republic','CZ'); add('Czechia','CZ');
+  add('Ivory Coast','CI'); add("Cote d'Ivoire",'CI'); add("Côte d'Ivoire",'CI'); add("Côte d’Ivoire",'CI');
+  add('Syria','SY'); add('Syrian Arab Republic','SY');
+  add('Venezuela','VE'); add('Venezuela, Bolivarian Republic of','VE');
+  add('Bolivia','BO'); add('Bolivia, Plurinational State of','BO');
+  add('Tanzania','TZ'); add('Tanzania, United Republic of','TZ');
+  add('Iran','IR'); add('Iran, Islamic Republic of','IR');
+  add('Laos','LA'); add("Lao People's Democratic Republic",'LA');
+  add('Moldova','MD'); add('Moldova, Republic of','MD');
+  add('Palestine','PS'); add('Palestine, State of','PS');
+  add('Vietnam','VN'); add('Viet Nam','VN');
+  add('Brunei','BN'); add('Brunei Darussalam','BN');
+  add('Cape Verde','CV'); add('Cabo Verde','CV');
+  add('Swaziland','SZ'); add('Eswatini','SZ');
+  add('Micronesia','FM'); add('Micronesia, Federated States of','FM');
+  add('Kosovo','XK');
+  add('European Union','EU'); add('EU','EU');
+  add('United Nations','UN'); add('UN','UN');
+  add('Puerto Rico','PR');
+add('Saint Martin (FR)','MF'); add('St Martin (FR)','MF'); add('Saint Martin','MF');
+add('Sint Maarten (NL)','SX'); add('St Maarten (NL)','SX'); add('Sint Maarten','SX');
+add('Virgin Islands (U.S.)','VI'); add('US Virgin Islands','VI'); add('U.S. Virgin Islands','VI');
+add('Virgin Islands (British)','VG'); add('British Virgin Islands','VG');
+add('Curaçao','CW'); add('Curacao','CW');
+add('Réunion','RE'); add('Reunion','RE');
+add('Bonaire','BQ'); add('Bonaire, Saint Eustatius and Saba','BQ');
+add('Saint Barthélemy','BL'); add('St Barthélemy','BL'); add('Saint Barthelemy','BL'); add('St Barthelemy','BL');
+add('Svalbard and Jan Mayen','SJ');
+add('Åland Islands','AX'); add('Aland Islands','AX');
+add('Cocos (Keeling) Islands','CC');
+add('Falkland Islands','FK'); add('Falkland Islands (Malvinas)','FK');
+add('French Guiana','GF');
+add('French Polynesia','PF');
+add('New Caledonia','NC');
+add('Wallis and Futuna','WF');
+add('Saint Pierre and Miquelon','PM');
+add('Pitcairn Islands','PN'); add('Pitcairn','PN');
+add('U.S. Minor Outlying Islands','UM'); add('United States Minor Outlying Islands','UM');
+add('Hong Kong','HK'); add('Macao','MO'); add('Macau','MO');
+add('Taiwan','TW'); add('Taiwan, Province of China','TW');
+add('Congo','CG'); add('Congo (Republic)','CG'); add('Republic of the Congo','CG');
+add('DR Congo','CD'); add('Congo (Democratic Republic)','CD'); add('Democratic Republic of the Congo','CD');
+  add('Saint Kitts and Nevis','KN'); add('St Kitts and Nevis','KN'); add('St. Kitts and Nevis','KN'); add('Saint Kitts & Nevis','KN'); add('St Kitts & Nevis','KN'); add('St. Kitts & Nevis','KN');
+  return map;
+})();
+function flagFromISO2(iso2){
       const s = String(iso2||'').trim().toUpperCase();
       if(!/^[A-Z]{2}$/.test(s)) return '';
       const A = 0x1F1E6;
@@ -733,10 +793,11 @@
     }
 
     function countryFlag(country){
-      const c = normalizeCountry(country);
-      const iso2 = ISO2_BY_COUNTRY[c];
-      return iso2 ? flagFromISO2(iso2) : '';
-    }
+  const c = normalizeCountry(country);
+  const key = String(c||'').trim();
+  const iso2 = ISO2_BY_COUNTRY[key] || ISO2_BY_COUNTRY[key.toLowerCase()] || (/^[A-Z]{2}$/i.test(key) ? key : '');
+  return iso2 ? flagFromISO2(iso2) : '';
+}
 
     function fmtDistance(meters){
       if(!Number.isFinite(meters)) return '—';
@@ -1412,10 +1473,8 @@ if(logsEl){
   for(const log of logs){
     const logType = textOf(firstByLocalName(log,'type'),'').toLowerCase();
 
-    // Default behavior: use the "Found it" log date
     let isFindLog = (logType.indexOf('found') !== -1);
 
-    // Webcam caches: use the "Webcam Photo Taken" log date (PQ does not necessarily include "Found it")
     if(!isFindLog && isWebcam){
       isFindLog = (logType.indexOf('webcam photo taken') !== -1);
     }
