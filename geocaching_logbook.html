@@ -1404,20 +1404,33 @@
         let foundMs = null;
 
         const logsEl = firstByLocalName(gsCache,'logs');
-        if(logsEl){
-          const logs = Array.from(logsEl.getElementsByTagName('*')).filter(el=>el.localName==='log');
-          for(const log of logs){
-            const logType = textOf(firstByLocalName(log,'type'),'').toLowerCase();
-            if(logType.indexOf('found')===-1) continue;
-            const dateIso = textOf(firstByLocalName(log,'date'),'');
-            const d = new Date(dateIso);
-            if(!Number.isNaN(d.getTime())){
-              foundIso = dateIso;
-              foundMs = d.getTime();
-              break;
-            }
-          }
-        }
+if(logsEl){
+  const logs = Array.from(logsEl.getElementsByTagName('*')).filter(el=>el.localName==='log');
+
+  const isWebcam = String(cacheType||'').toLowerCase().includes('webcam');
+
+  for(const log of logs){
+    const logType = textOf(firstByLocalName(log,'type'),'').toLowerCase();
+
+    // Default behavior: use the "Found it" log date
+    let isFindLog = (logType.indexOf('found') !== -1);
+
+    // Webcam caches: use the "Webcam Photo Taken" log date (PQ does not necessarily include "Found it")
+    if(!isFindLog && isWebcam){
+      isFindLog = (logType.indexOf('webcam photo taken') !== -1);
+    }
+
+    if(!isFindLog) continue;
+
+    const dateIso = textOf(firstByLocalName(log,'date'),'');
+    const d = new Date(dateIso);
+    if(!Number.isNaN(d.getTime())){
+      foundIso = dateIso;
+      foundMs = d.getTime();
+      break;
+    }
+  }
+}
 
         if(!foundIso){
           const timeText = textOf(firstByLocalName(wpt,'time'),'');
