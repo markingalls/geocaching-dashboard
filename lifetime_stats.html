@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lifetime Stats</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#07140e;
+      --card:rgba(255,255,255,0.06);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.68);
+      --shadow:0 18px 45px rgba(0,0,0,0.35);
+      --radius:24px;
+      --border:rgba(255,255,255,0.10);
+    }
+    html,body{
+      margin:0;
+      background:
+        radial-gradient(1100px 760px at 12% 12%, rgba(34,197,94,0.16), transparent 55%),
+        radial-gradient(980px 720px at 88% 18%, rgba(16,185,129,0.14), transparent 60%),
+        radial-gradient(980px 920px at 60% 92%, rgba(132,204,22,0.10), transparent 55%),
+        linear-gradient(180deg, rgba(3,12,8,1), rgba(7,20,14,1));
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px;}
+    .top{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+      border-radius:20px;
+      padding:14px 14px 12px;
+      box-shadow:var(--shadow);
+      display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+      position:relative;
+    }
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    input[type=file], input[type=text]{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.14);
+      color:var(--text);
+      padding:9px 10px;border-radius:12px;
+      outline:none;
+    }
+    input[type=text]{width:140px;}
+    input[type=text].narrow{width:118px;}
+    .pill{
+      padding:8px 12px;border-radius:999px;
+      background:rgba(34,197,94,0.12);
+      border:1px solid rgba(34,197,94,0.22);
+      color:var(--text);font-size:13px;white-space:nowrap;
+    }
+    .status{color:var(--muted);font-size:13px;}
+    .section{
+      position:relative;
+      background:linear-gradient(180deg,var(--card),rgba(255,255,255,0.03));
+      border:1px solid var(--border);
+      box-shadow:var(--shadow);
+      border-radius:var(--radius);
+      padding:26px;
+      margin:20px 0;
+      overflow:hidden;
+    }
+    .section::before{
+      content:"";
+      position:absolute;inset:-2px;
+      background:
+        radial-gradient(640px 420px at 18% 0%, rgba(34,197,94,0.14), transparent 62%),
+        radial-gradient(640px 420px at 82% 10%, rgba(16,185,129,0.12), transparent 66%);
+      pointer-events:none;
+    }
+    .section>*{position:relative;z-index:1;}
+    .title{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+    h1{font-size:44px;margin:0;letter-spacing:-0.02em;}
+    h2{font-size:22px;margin:0 0 10px 0;letter-spacing:-0.01em;}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:10px 14px;border-radius:999px;
+      background:rgba(34,197,94,0.12);
+      border:1px solid rgba(34,197,94,0.25);
+      color:var(--text);font-weight:800;
+    }
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:18px;}
+    .card{background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:18px;padding:16px;}
+    .span-12{grid-column:span 12;}
+    @media (max-width:980px){ h1{font-size:36px;} }
+
+    .table{width:100%;border-collapse:collapse;font-size:14px;overflow:hidden;border-radius:16px;}
+    .table th,.table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;}
+    .table th{text-align:left;color:rgba(255,255,255,0.85);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;background:rgba(255,255,255,0.04);}
+    .table tr:last-child td{border-bottom:none;}
+    .k{color:rgba(255,255,255,0.85);font-weight:800;}
+    .v{color:rgba(255,255,255,0.92);}
+
+    .switchWrap{display:flex;align-items:center;gap:10px;}
+    .switchText{font-size:13px;color:var(--text);font-weight:700;white-space:nowrap;}
+    .switch{position:relative;width:54px;height:30px;flex:0 0 auto;}
+    .switch input{opacity:0;width:0;height:0;}
+    .slider{
+      position:absolute;inset:0;
+      background:rgba(255,255,255,0.12);
+      border:1px solid rgba(255,255,255,0.18);
+      border-radius:999px;
+      transition:0.18s ease;
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,0.10);
+    }
+    .slider:before{
+      content:"";
+      position:absolute;
+      height:24px;width:24px;
+      left:3px;top:2.5px;
+      background:rgba(255,255,255,0.88);
+      border-radius:50%;
+      transition:0.18s ease;
+    }
+    .switch input:checked + .slider{
+      background:rgba(34,197,94,0.20);
+      border-color:rgba(34,197,94,0.28);
+    }
+    .switch input:checked + .slider:before{ transform:translateX(24px); }
+
+    .drop{
+      border:1px dashed rgba(255,255,255,0.22);
+      background:rgba(255,255,255,0.03);
+      border-radius:16px;
+      padding:14px;
+      width:100%;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+    .drop strong{font-weight:900;}
+    .small{color:var(--muted);font-size:13px;}
+    @media (max-width: 520px){
+      .section { padding: 18px; }
+      .top { padding: 12px; }
+      .table th, .table td{ padding: 8px 10px; }
+      .table{ font-size: 13px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top" id="top">
+      <div class="row" style="width:100%;justify-content:space-between;gap:12px;">
+        <div class="row">
+          <div class="switchWrap">
+            <div class="pill">Units</div>
+            <span class="switchText" id="unitLeft">Metric</span>
+            <label class="switch" title="Toggle metric/imperial">
+              <input id="unitToggle" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+            <span class="switchText" id="unitRight" style="opacity:.75;">Imperial</span>
+          </div>
+
+          <div class="pill">Username</div>
+          <input id="userName" type="text" placeholder="your_username" />
+
+          <div class="pill">UTC offset</div>
+          <input id="utcOffset" class="narrow" type="text" value="-08:00" />
+
+          <div class="pill">Home lat</div>
+          <input id="homeLat" class="narrow" type="text" value="0" placeholder="0 / 49° 16.962' N" />
+
+          <div class="pill">Home lon</div>
+          <input id="homeLon" class="narrow" type="text" value="0" placeholder="0 / 123° 7.200' W" />
+        </div>
+
+        <div class="row" style="align-items:flex-start;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <input id="fileInput" type="file" accept=".zip,.gpx,.xml" />
+              <div class="status" id="status">Waiting for file…</div>
+            </div>
+            <div class="small" style="max-width:560px;">
+              All data is calculated locally in your browser. Nothing is uploaded.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drop" id="dropZone" aria-label="Drop a Pocket Query ZIP here">
+        <div>
+          <strong>Drop your Pocket Query ZIP/GPX here</strong>
+          <div class="small">Or use “Choose File” above.</div>
+        </div>
+        <div class="badge" id="bubble">🧭 Load a Pocket Query</div>
+      </div>
+    </div>
+
+    <section class="section" id="statsSection">
+      <div class="title">
+        <div>
+          <h1 id="titleH1">Lifetime Stats</h1>
+          <div class="small" id="subtitleLine">Load a file to generate your dashboard.</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card span-12">
+          <h2>Summary</h2>
+          <table class="table" id="statsTable">
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td class="k">Total finds</td><td class="v" id="v_total">—</td></tr>
+              <tr><td class="k">Average</td><td class="v" id="v_avg">—</td></tr>
+              <tr><td class="k">Last 365 days</td><td class="v" id="v_365">—</td></tr>
+              <tr><td class="k">Longest streak</td><td class="v" id="v_streak">—</td></tr>
+              <tr><td class="k">Biggest day</td><td class="v" id="v_bigday">—</td></tr>
+              <tr><td class="k">Biggest month</td><td class="v" id="v_bigmonth">—</td></tr>
+              <tr><td class="k">Most countries in a day</td><td class="v" id="v_mostcountries">—</td></tr>
+              <tr><td class="k">Fastest 100 finds</td><td class="v" id="v_fast100">—</td></tr>
+              <tr><td class="k">Fastest 1,000 finds</td><td class="v" id="v_fast1000">—</td></tr>
+              <tr><td class="k">Distance traveled</td><td class="v" id="v_travel">—</td></tr>
+              <tr><td class="k">Furthest single day distance</td><td class="v" id="v_bigdaydist">—</td></tr>
+
+              <tr><td class="k">Most northerly find</td><td class="v" id="v_north">—</td></tr>
+              <tr><td class="k">Most southerly find</td><td class="v" id="v_south">—</td></tr>
+              <tr><td class="k">Most easterly find</td><td class="v" id="v_east">—</td></tr>
+              <tr><td class="k">Most westerly find</td><td class="v" id="v_west">—</td></tr>
+              <tr><td class="k">Closest find</td><td class="v" id="v_closest">—</td></tr>
+              <tr><td class="k">Furthest find</td><td class="v" id="v_furthest">—</td></tr>
+
+              <tr><td class="k">Cache centroid</td><td class="v" id="v_centroid">—</td></tr>
+              <tr><td class="k">2-character QTH grids</td><td class="v" id="v_qth2">—</td></tr>
+              <tr><td class="k">4-character QTH grids</td><td class="v" id="v_qth4">—</td></tr>
+              <tr><td class="k">6-character QTH grids</td><td class="v" id="v_qth6">—</td></tr>
+            </tbody>
+          </table>
+          <div class="small" style="margin-top:10px;">Dates are shown in <b>YYYY-MM-DD</b> unless otherwise stated.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // -----------------------------
+    // Utilities
+    // -----------------------------
+    function escapeHtml(s){
+      const str = String(s==null?'':s);
+      return str
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#039;');
+    }
+
+    function fmtInt(n){ return (n||0).toLocaleString(); }
+
+    function parseOffsetMinutes(s){
+      const str = String(s||'').trim();
+      const m = str.match(/^([+-])(\d{2}):(\d{2})$/);
+      if(!m) return null;
+      const sign = m[1] === '-' ? -1 : 1;
+      const hh = parseInt(m[2],10), mm = parseInt(m[3],10);
+      if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+      return sign * (hh*60 + mm);
+    }
+
+    function ymdFromDateWithOffset(dateObj, offsetMinutes){
+      const ms = dateObj.getTime();
+      const adj = ms + offsetMinutes*60000;
+      const d = new Date(adj);
+      const Y = d.getUTCFullYear();
+      const M = String(d.getUTCMonth()+1).padStart(2,'0');
+      const D = String(d.getUTCDate()).padStart(2,'0');
+      return `${Y}-${M}-${D}`;
+    }
+
+    function monthFromYMD(ymd){ return ymd.slice(0,7); }
+
+    function dayNumFromYMD(ymd){
+      const Y=parseInt(ymd.slice(0,4),10);
+      const M=parseInt(ymd.slice(5,7),10);
+      const D=parseInt(ymd.slice(8,10),10);
+      return Date.UTC(Y,M-1,D)/86400000;
+    }
+
+    function addDaysYMD(ymd, delta){
+      const Y=parseInt(ymd.slice(0,4),10);
+      const M=parseInt(ymd.slice(5,7),10);
+      const D=parseInt(ymd.slice(8,10),10);
+      const dt = new Date(Date.UTC(Y,M-1,D) + delta*86400000);
+      return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+    }
+
+    function normalizeCountry(c){
+      const s = String(c||'').trim();
+      return s || 'Unknown';
+    }
+
+    function isLocationlessType(cacheType){
+      const t = String(cacheType||'').trim();
+      return t === 'Geocache|Locationless (Reverse) Cache';
+    }
+
+    function haversineMeters(lat1,lon1,lat2,lon2){
+      const R=6371000;
+      const toRad=(x)=>x*Math.PI/180;
+      const dLat=toRad(lat2-lat1);
+      let dLon=toRad(lon2-lon1);
+      // wrap for dateline shortest path
+      const pi=Math.PI;
+      if(dLon >  pi) dLon -= 2*pi;
+      if(dLon < -pi) dLon += 2*pi;
+      const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    }
+
+    function wrapDeltaLon(lon, refLon){
+      let d = lon - refLon;
+      d = ((d + 540) % 360) - 180;
+      return d;
+    }
+
+    let UNIT_SYSTEM = 'metric';
+    function fmtDistance(meters){
+      if(!Number.isFinite(meters)) return '—';
+      if(UNIT_SYSTEM === 'imperial'){
+        const miles = meters / 1609.344;
+        const dec = miles < 100 ? 1 : 0;
+        return miles.toLocaleString(undefined,{maximumFractionDigits:dec}) + ' mi';
+      }
+      const km = meters / 1000;
+      const dec = km < 100 ? 1 : 0;
+      return km.toLocaleString(undefined,{maximumFractionDigits:dec}) + ' km';
+    }
+
+    function degMinStr(valueAbs, padDeg){
+      const deg = Math.floor(valueAbs);
+      const min = (valueAbs - deg) * 60;
+      const degStr = String(deg).padStart(padDeg,'0');
+      const minStr = min.toFixed(3).padStart(6,'0');
+      return `${degStr}º ${minStr}`;
+    }
+
+    function fmtLatDMM(lat){
+      if(!Number.isFinite(lat)) return '—';
+      const hemi = lat >= 0 ? 'N' : 'S';
+      return `${hemi} ${degMinStr(Math.abs(lat),2)}`;
+    }
+
+    function fmtLonDMM(lon){
+      if(!Number.isFinite(lon)) return '—';
+      const hemi = lon >= 0 ? 'E' : 'W';
+      return `${hemi} ${degMinStr(Math.abs(lon),3)}`;
+    }
+
+    function parseCoord(input, kind){
+      const s0 = String(input||'').trim();
+      if(!s0) return null;
+
+      const s = s0.replace(/[º°]/g,' ').replace(/[′']/g,' ').replace(/[″"]/g,' ').replace(/,/g,' ').replace(/\s+/g,' ').trim();
+      const upper = s.toUpperCase();
+
+      let dir = null;
+      const dirMatch = upper.match(/\b([NSEW])\b/);
+      if(dirMatch) dir = dirMatch[1];
+
+      const numericPart = upper.replace(/\b[NSWE]\b/g,' ').replace(/\s+/g,' ').trim();
+      const nums = numericPart.split(' ').map(x=>parseFloat(x)).filter(v=>Number.isFinite(v));
+      if(!nums.length) return null;
+
+      if(nums.length === 1){
+        let val = nums[0];
+        if(dir){
+          const isNeg = (dir==='S' || dir==='W');
+          val = Math.abs(val) * (isNeg ? -1 : 1);
+        }
+        if(kind==='lat' && Math.abs(val) > 90.000001) return null;
+        if(kind==='lon' && Math.abs(val) > 180.000001) return null;
+        return val;
+      }
+
+      let deg = nums[0], min = nums[1] ?? 0, sec = nums[2] ?? 0;
+      const abs = Math.abs(deg) + (Math.abs(min) / 60) + (Math.abs(sec) / 3600);
+      let sign = (deg < 0) ? -1 : 1;
+      if(dir) sign = (dir==='S' || dir==='W') ? -1 : 1;
+      const out = abs * sign;
+
+      if(kind==='lat' && Math.abs(out) > 90.000001) return null;
+      if(kind==='lon' && Math.abs(out) > 180.000001) return null;
+      return out;
+    }
+
+    // Country flags
+    const ISO2_CODES = ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "EU", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "UN", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "XK", "YE", "YT", "ZA", "ZM", "ZW"];
+    const ISO2_BY_COUNTRY = (function(){
+      const norm = s => String(s||'').trim().toLowerCase().replace(/[\u2019']/g,"'").replace(/[^a-z0-9]+/g,' ').trim();
+      const map = Object.create(null);
+      const add = (name, code) => { if(name && code) map[norm(name)] = code; };
+
+      let dnEn = null;
+      let dnLocal = null;
+      if(typeof Intl !== 'undefined' && Intl.DisplayNames){
+        try{ dnEn = new Intl.DisplayNames(['en'],{type:'region'}); }catch(e){}
+        try{ dnLocal = new Intl.DisplayNames([navigator.language||'en'],{type:'region'}); }catch(e){}
+      }
+
+      for(const code of ISO2_CODES){
+        add(code, code);
+        if(dnEn){ const n = dnEn.of(code); if(n) add(n, code); }
+        if(dnLocal){ const n = dnLocal.of(code); if(n) add(n, code); }
+      }
+
+      add('United States','US'); add('USA','US'); add('U.S.A.','US'); add('United States of America','US');
+      add('United Kingdom','GB'); add('UK','GB'); add('Great Britain','GB'); add('Britain','GB');
+      add('Russia','RU'); add('Russian Federation','RU');
+      add('South Korea','KR'); add('Korea, Republic of','KR');
+      add('North Korea','KP'); add("Korea, Democratic People's Republic of",'KP');
+      add('Czech Republic','CZ'); add('Czechia','CZ');
+      add('Ivory Coast','CI'); add("Cote d'Ivoire",'CI'); add("Côte d'Ivoire",'CI'); add("Côte d’Ivoire",'CI');
+      add('Syria','SY'); add('Syrian Arab Republic','SY');
+      add('Venezuela','VE'); add('Venezuela, Bolivarian Republic of','VE');
+      add('Bolivia','BO'); add('Bolivia, Plurinational State of','BO');
+      add('Tanzania','TZ'); add('Tanzania, United Republic of','TZ');
+      add('Iran','IR'); add('Iran, Islamic Republic of','IR');
+      add('Laos','LA'); add("Lao People's Democratic Republic",'LA');
+      add('Moldova','MD'); add('Moldova, Republic of','MD');
+      add('Palestine','PS'); add('Palestine, State of','PS');
+      add('Vietnam','VN'); add('Viet Nam','VN');
+      add('Brunei','BN'); add('Brunei Darussalam','BN');
+      add('Cape Verde','CV'); add('Cabo Verde','CV');
+      add('Swaziland','SZ'); add('Eswatini','SZ');
+      add('Micronesia','FM'); add('Micronesia, Federated States of','FM');
+      add('Kosovo','XK');
+      add('European Union','EU'); add('EU','EU');
+      add('United Nations','UN'); add('UN','UN');
+      add('Puerto Rico','PR');
+      add('Curaçao','CW'); add('Curacao','CW');
+      add('Réunion','RE'); add('Reunion','RE');
+      add('Åland Islands','AX'); add('Aland Islands','AX');
+
+      return map;
+    })();
+
+    function flagFromISO2(iso2){
+      const s = String(iso2||'').trim().toUpperCase();
+      if(!/^[A-Z]{2}$/.test(s)) return '';
+      const A = 0x1F1E6;
+      const c1 = A + (s.charCodeAt(0) - 65);
+      const c2 = A + (s.charCodeAt(1) - 65);
+      return String.fromCodePoint(c1, c2);
+    }
+
+    function countryFlag(country){
+      const c = normalizeCountry(country);
+      const key = String(c||'').trim();
+      const iso2 = ISO2_BY_COUNTRY[key] || ISO2_BY_COUNTRY[key.toLowerCase()] || (/^[A-Z]{2}$/i.test(key) ? key : '');
+      return iso2 ? flagFromISO2(iso2) : '';
+    }
+
+    function firstByLocalName(parent, local){
+      if(!parent) return null;
+      const all=parent.getElementsByTagName('*');
+      for(const el of all){ if(el.localName===local) return el; }
+      return null;
+    }
+    function textOf(el, fallback){
+      const t = el && el.textContent ? el.textContent.trim() : '';
+      return t ? t : (fallback || '');
+    }
+
+    function setStatus(msg){ document.getElementById('status').textContent = msg; }
+
+    // Maidenhead grid: returns 2/4/6 characters
+    function maidenhead(lat, lon, precision){
+      if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      if(lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+      let adjLon = lon + 180;
+      let adjLat = lat + 90;
+
+      const A = 'A'.charCodeAt(0);
+      const fieldLon = Math.floor(adjLon / 20);
+      const fieldLat = Math.floor(adjLat / 10);
+
+      let locator = String.fromCharCode(A + fieldLon) + String.fromCharCode(A + fieldLat);
+      if(precision <= 2) return locator;
+
+      adjLon = adjLon % 20;
+      adjLat = adjLat % 10;
+
+      const squareLon = Math.floor(adjLon / 2);
+      const squareLat = Math.floor(adjLat / 1);
+      locator += String(squareLon) + String(squareLat);
+      if(precision <= 4) return locator;
+
+      adjLon = adjLon % 2;
+      adjLat = adjLat % 1;
+
+      const subsLon = Math.floor(adjLon * 12);
+      const subsLat = Math.floor(adjLat * 24);
+      locator += String.fromCharCode(A + subsLon) + String.fromCharCode(A + subsLat);
+      return locator;
+    }
+
+    function sphericalWeiszfeldMedian(latLonList){
+      if(!latLonList || !latLonList.length) return null;
+
+      const toRad = d => d*Math.PI/180;
+      const toDeg = r => r*180/Math.PI;
+
+      function toVec(lat, lon){
+        const φ = toRad(lat), λ = toRad(lon);
+        const c = Math.cos(φ);
+        return [c*Math.cos(λ), c*Math.sin(λ), Math.sin(φ)];
+      }
+      function norm(v){
+        const m = Math.hypot(v[0],v[1],v[2]);
+        return m > 0 ? [v[0]/m, v[1]/m, v[2]/m] : [1,0,0];
+      }
+      function ang(a,b){
+        const dot = Math.max(-1, Math.min(1, a[0]*b[0]+a[1]*b[1]+a[2]*b[2]));
+        return Math.acos(dot);
+      }
+      function toLatLon(v){
+        const [x,y,z] = norm(v);
+        const lat = toDeg(Math.asin(z));
+        const lon = toDeg(Math.atan2(y,x));
+        return {lat, lon};
+      }
+
+      let v = [0,0,0];
+      const vecs = latLonList.map(p=>toVec(p.lat,p.lon));
+      for(const u of vecs){ v[0]+=u[0]; v[1]+=u[1]; v[2]+=u[2]; }
+      v = norm(v);
+
+      for(let iter=0; iter<80; iter++){ 
+        let sum = [0,0,0];
+        let wsum = 0;
+        let maxMove = 0;
+
+        for(const u of vecs){
+          const d = ang(v,u);
+          const w = 1 / Math.max(1e-8, d);
+          sum[0] += w*u[0]; sum[1] += w*u[1]; sum[2] += w*u[2];
+          wsum += w;
+        }
+        const v2 = norm([sum[0]/wsum, sum[1]/wsum, sum[2]/wsum]);
+        maxMove = ang(v, v2);
+        v = v2;
+        if(maxMove < 1e-10) break;
+      }
+      return toLatLon(v);
+    }
+
+    // -----------------------------
+    // State + rendering
+    // -----------------------------
+    let RAW_FINDS_ALL = [];
+    let LAST_XML = null;
+
+    function getHome(){
+      const lat = parseCoord(document.getElementById('homeLat').value, 'lat');
+      const lon = parseCoord(document.getElementById('homeLon').value, 'lon');
+      return {
+        lat: (lat == null ? 0 : lat),
+        lon: (lon == null ? 0 : lon)
+      };
+    }
+
+    function getUsername(){ return String(document.getElementById('userName').value || '').trim(); }
+
+    function setCell(id, text){ document.getElementById(id).textContent = text; }
+
+    function setBubble(total, startYear, endYear, mostRecentYMD){
+      const b = document.getElementById('bubble');
+      if(!total){ b.textContent = '🧭 Load a Pocket Query'; return; }
+      b.textContent = `🧭 ${fmtInt(total)} finds from ${startYear} to ${endYear}`;
+
+      const sub = document.getElementById('subtitleLine');
+      const username = getUsername();
+      const title = document.getElementById('titleH1');
+      title.textContent = username ? `Lifetime Stats for ${username}` : 'Lifetime Stats';
+      sub.innerHTML = `Most recent find included <b>${escapeHtml(mostRecentYMD||'—')}</b>`;
+      document.title = username ? `Lifetime Stats - ${username}` : 'Lifetime Stats';
+    }
+
+    function safeComputeAndRender(){
+      try{
+        computeAndRender();
+      }catch(e){
+        console.error(e);
+        setStatus('Error: ' + (e && e.message ? e.message : e));
+        alert('An error occurred while computing stats.\n\n' + (e && e.message ? e.message : e));
+      }
+    }
+
+    function computeAndRender(){
+      if(!RAW_FINDS_ALL.length) return;
+
+      const all = RAW_FINDS_ALL.slice().sort((a,b)=>{
+        const ta = a.timeMs ?? 0, tb = b.timeMs ?? 0;
+        if(ta !== tb) return ta - tb;
+        return (a.code||'').localeCompare(b.code||'');
+      });
+
+      const total = all.length;
+      const years = all.map(f=>f.year).filter(Number.isFinite).sort((a,b)=>a-b);
+      const startYear = years.length ? years[0] : '—';
+      const endYear = years.length ? years[years.length-1] : '—';
+      const mostRecentYMD = all.reduce((max,f)=> (f.ymd > max ? f.ymd : max), '0000-00-00');
+
+      setBubble(total, startYear, endYear, mostRecentYMD);
+
+      const daysSet = new Set(all.map(f=>f.ymd));
+      const days = daysSet.size;
+      setCell('v_total', `${fmtInt(total)} finds across ${fmtInt(days)} days geocached`);
+      setCell('v_avg', days ? `${(total/days).toFixed(2)} finds per geocaching day` : '—');
+
+      const cutoff = addDaysYMD(mostRecentYMD, -364);
+      const last365 = all.filter(f=>f.ymd >= cutoff && f.ymd <= mostRecentYMD).length;
+      setCell('v_365', `${fmtInt(last365)} finds (from ${cutoff} to ${mostRecentYMD})`);
+
+      const dates = Array.from(daysSet).sort();
+      let bestLen = dates.length ? 1 : 0, bestStart = dates[0]||'—', bestEnd = dates[0]||'—';
+      let curLen = dates.length ? 1 : 0, curStart = dates[0]||'—';
+      for(let i=1;i<dates.length;i++){ 
+        const prev = dates[i-1], cur = dates[i];
+        if(dayNumFromYMD(cur) === dayNumFromYMD(prev) + 1) curLen += 1;
+        else {
+          if(curLen > bestLen){ bestLen = curLen; bestStart = curStart; bestEnd = prev; }
+          curLen = 1; curStart = cur;
+        }
+      }
+      if(curLen > bestLen && dates.length){ bestLen = curLen; bestStart = curStart; bestEnd = dates[dates.length-1]; }
+      setCell('v_streak', bestLen ? `${fmtInt(bestLen)} days in a row from ${bestStart} to ${bestEnd}` : '—');
+
+      const byDay = new Map();
+      for(const f of all) byDay.set(f.ymd, (byDay.get(f.ymd)||0)+1);
+      let bigDay = null;
+      for(const [d,c] of byDay.entries()){ if(!bigDay || c > bigDay.count) bigDay = {date:d, count:c}; }
+      setCell('v_bigday', bigDay ? `${fmtInt(bigDay.count)} on ${bigDay.date}` : '—');
+
+      const byMonth = new Map();
+      for(const f of all){ const m = monthFromYMD(f.ymd); byMonth.set(m, (byMonth.get(m)||0)+1); }
+      let bigMonth = null;
+      for(const [m,c] of byMonth.entries()){ if(!bigMonth || c > bigMonth.count) bigMonth = {month:m, count:c}; }
+      setCell('v_bigmonth', bigMonth ? `${fmtInt(bigMonth.count)} in ${bigMonth.month}` : '—');
+
+      const byDayCountries = new Map();
+      for(const f of all){
+        const d = f.ymd;
+        const c = normalizeCountry(f.country);
+        if(!byDayCountries.has(d)) byDayCountries.set(d, new Set());
+        if(c) byDayCountries.get(d).add(c);
+      }
+      let mostCountries = null;
+      for(const [d,set] of byDayCountries.entries()){ 
+        const n = set.size;
+        if(!mostCountries || n > mostCountries.count) mostCountries = {date:d, count:n, countries:Array.from(set)};
+      }
+      if(mostCountries){
+        const flags = mostCountries.countries.map(countryFlag).filter(Boolean).slice(0, 24).join(' ');
+        setCell('v_mostcountries', `${fmtInt(mostCountries.count)} ${flags ? '('+flags+')' : ''} on ${mostCountries.date}`);
+      } else setCell('v_mostcountries','—');
+
+      function fastestWindow(n){
+        if(total < n) return null;
+        let best = null;
+        for(let i=0; i+n-1<total; i++){ 
+          const a = all[i], b = all[i+n-1];
+          const days = (dayNumFromYMD(b.ymd) - dayNumFromYMD(a.ymd)) + 1;
+          if(!best || days < best.days) best = {days, start:a.ymd, end:b.ymd};
+        }
+        return best;
+      }
+      const f100 = fastestWindow(100);
+      setCell('v_fast100', f100 ? `${fmtInt(f100.days)} days from ${f100.start} to ${f100.end}` : '—');
+      const f1000 = fastestWindow(1000);
+      setCell('v_fast1000', f1000 ? `${fmtInt(f1000.days)} days from ${f1000.start} to ${f1000.end}` : '—');
+
+      const located = all.filter(f=> Number.isFinite(f.lat) && Number.isFinite(f.lon) && !isLocationlessType(f.cacheType));
+
+      let travelMeters = 0;
+      for(let i=1;i<located.length;i++) travelMeters += haversineMeters(located[i-1].lat, located[i-1].lon, located[i].lat, located[i].lon);
+      setCell('v_travel', fmtDistance(travelMeters));
+
+      const byDayLocated = new Map();
+      for(const f of located){ if(!byDayLocated.has(f.ymd)) byDayLocated.set(f.ymd, []); byDayLocated.get(f.ymd).push(f); }
+      let bigDayDist = null;
+      for(const [d,list] of byDayLocated.entries()){ 
+        list.sort((a,b)=>(a.timeMs??0)-(b.timeMs??0));
+        let meters = 0;
+        for(let i=1;i<list.length;i++) meters += haversineMeters(list[i-1].lat, list[i-1].lon, list[i].lat, list[i].lon);
+        if(!bigDayDist || meters > bigDayDist.meters) bigDayDist = {date:d, meters};
+      }
+      setCell('v_bigdaydist', bigDayDist ? `${fmtDistance(bigDayDist.meters)} (${bigDayDist.date})` : '—');
+
+      const home = getHome();
+      const homeLat = home.lat, homeLon = home.lon;
+
+      let mostN=null, mostS=null;
+      for(const f of located){ if(!mostN || f.lat > mostN.lat) mostN=f; if(!mostS || f.lat < mostS.lat) mostS=f; }
+      setCell('v_north', mostN ? `${fmtLatDMM(mostN.lat)} ${mostN.code} ${mostN.name} ${countryFlag(mostN.country)}` : '—');
+      setCell('v_south', mostS ? `${fmtLatDMM(mostS.lat)} ${mostS.code} ${mostS.name} ${countryFlag(mostS.country)}` : '—');
+
+      let mostE=null, mostW=null;
+      for(const f of located){
+        const dLon = wrapDeltaLon(f.lon, homeLon);
+        if(!mostE || dLon > mostE._d) mostE = Object.assign({_d:dLon}, f);
+        if(!mostW || dLon < mostW._d) mostW = Object.assign({_d:dLon}, f);
+      }
+      setCell('v_east', mostE ? `${fmtLonDMM(mostE.lon)} ${mostE.code} ${mostE.name} ${countryFlag(mostE.country)}` : '—');
+      setCell('v_west', mostW ? `${fmtLonDMM(mostW.lon)} ${mostW.code} ${mostW.name} ${countryFlag(mostW.country)}` : '—');
+
+      let closest=null, furthest=null;
+      for(const f of located){
+        const m = haversineMeters(homeLat, homeLon, f.lat, f.lon);
+        if(!closest || m < closest.m) closest = {m, f};
+        if(!furthest || m > furthest.m) furthest = {m, f};
+      }
+      setCell('v_closest', closest ? `${fmtDistance(closest.m)}, ${closest.f.code} ${closest.f.name}` : '—');
+      setCell('v_furthest', furthest ? `${fmtDistance(furthest.m)}, ${furthest.f.code} ${furthest.f.name}` : '—');
+
+      const centroid = sphericalWeiszfeldMedian(located.map(f=>({lat:f.lat, lon:f.lon})));
+      if(centroid){
+        const d = haversineMeters(homeLat, homeLon, centroid.lat, centroid.lon);
+        setCell('v_centroid', `${fmtLatDMM(centroid.lat)} ${fmtLonDMM(centroid.lon)} (${fmtDistance(d)} from home)`);
+      } else setCell('v_centroid','—');
+
+      const grids2 = new Set(), grids4 = new Set(), grids6 = new Set();
+      for(const f of located){
+        const g2 = maidenhead(f.lat, f.lon, 2);
+        const g4 = maidenhead(f.lat, f.lon, 4);
+        const g6 = maidenhead(f.lat, f.lon, 6);
+        if(g2) grids2.add(g2);
+        if(g4) grids4.add(g4);
+        if(g6) grids6.add(g6);
+      }
+      const total2 = 18*18;
+      const total4 = total2*10*10;
+      const total6 = total4*24*24;
+      const pct = (a,b,dec)=> b ? (100*a/b).toFixed(dec) : '0';
+
+      setCell('v_qth2', `${fmtInt(grids2.size)} out of ${fmtInt(total2)} (${pct(grids2.size,total2,0)}%)`);
+      setCell('v_qth4', `${fmtInt(grids4.size)} out of ${fmtInt(total4)} (${pct(grids4.size,total4,1)}%)`);
+      setCell('v_qth6', `${fmtInt(grids6.size)} out of ${fmtInt(total6)} (${pct(grids6.size,total6,1)}%)`);
+    }
+
+    // -----------------------------
+    // Parsing GPX
+    // -----------------------------
+    function parseFindsFromGpx(xml){
+      const offsetMinutes = parseOffsetMinutes(document.getElementById('utcOffset').value) ?? -480;
+      const wpts = Array.from(xml.getElementsByTagName('wpt'));
+      const finds = [];
+
+      for(const wpt of wpts){
+        const lat = parseFloat(wpt.getAttribute('lat'));
+        const lon = parseFloat(wpt.getAttribute('lon'));
+
+        const code = textOf(firstByLocalName(wpt,'name'),'');
+        const gsCache = firstByLocalName(wpt,'cache');
+        if(!gsCache) continue;
+
+        const cacheName =
+          textOf(firstByLocalName(gsCache,'name'),'') ||
+          textOf(firstByLocalName(wpt,'desc'),'') ||
+          code || 'Cache';
+
+        const cacheType = textOf(firstByLocalName(gsCache,'type'),'Unknown');
+        const country = normalizeCountry(textOf(firstByLocalName(gsCache,'country'),'Unknown'));
+
+        // Find date
+        let foundIso = null;
+        let foundMs = null;
+
+        const logsEl = firstByLocalName(gsCache,'logs');
+        if(logsEl){
+          const logs = Array.from(logsEl.getElementsByTagName('*')).filter(el=>el.localName==='log');
+          const isWebcam = String(cacheType||'').toLowerCase().includes('webcam');
+
+          for(const log of logs){
+            const logType = textOf(firstByLocalName(log,'type'),'').toLowerCase();
+            let isFindLog = (logType.indexOf('found') !== -1);
+            if(!isFindLog && isWebcam) isFindLog = (logType.indexOf('webcam photo taken') !== -1);
+            if(!isFindLog) continue;
+
+            const dateIso = textOf(firstByLocalName(log,'date'),'');
+            const d = new Date(dateIso);
+            if(!Number.isNaN(d.getTime())){ foundIso = dateIso; foundMs = d.getTime(); break; }
+          }
+        }
+
+        if(!foundIso){
+          const timeText = textOf(firstByLocalName(wpt,'time'),'');
+          const d = new Date(timeText);
+          if(!Number.isNaN(d.getTime())){ foundIso = timeText; foundMs = d.getTime(); }
+        }
+        if(!foundIso || foundMs == null) continue;
+
+        const ymd = ymdFromDateWithOffset(new Date(foundMs), offsetMinutes);
+        const year = parseInt(ymd.slice(0,4),10);
+        if(!Number.isFinite(year)) continue;
+
+        finds.push({
+          lat, lon,
+          code,
+          name: cacheName,
+          cacheType,
+          country,
+          ymd,
+          year,
+          timeMs: foundMs
+        });
+      }
+
+      finds.sort((a,b)=>{
+        if(a.timeMs!==b.timeMs) return a.timeMs-b.timeMs;
+        return (a.code||'').localeCompare(b.code||'');
+      });
+      return finds;
+    }
+
+    async function loadFile(file){
+      setStatus('Reading '+file.name+'…');
+      const buf = await file.arrayBuffer();
+
+      let gpxText = null;
+      const lower = file.name.toLowerCase();
+
+      if(lower.endsWith('.zip')){
+        const zip = await JSZip.loadAsync(buf);
+        const gpxFiles = [];
+        zip.forEach((path, entry)=>{
+          if(entry.dir) return;
+          if(path.toLowerCase().endsWith('.gpx')) gpxFiles.push(path);
+        });
+        if(!gpxFiles.length) throw new Error('No GPX files found in zip');
+
+        let bestPath=gpxFiles[0], bestSize=-1, bestContent=null;
+        for(const p of gpxFiles){
+          const content = await zip.file(p).async('string');
+          if(content.length>bestSize){ bestSize=content.length; bestPath=p; bestContent=content; }
+        }
+        gpxText = bestContent;
+        setStatus('Loaded '+bestPath);
+      } else {
+        gpxText = new TextDecoder('utf-8').decode(buf);
+        setStatus('Loaded GPX');
+      }
+
+      if(!gpxText || gpxText.indexOf('<gpx')===-1) throw new Error('File did not look like a GPX');
+      const xml = new DOMParser().parseFromString(gpxText,'text/xml');
+      const parserError = xml.getElementsByTagName('parsererror');
+      if(parserError && parserError.length) throw new Error('GPX XML parse error');
+
+      LAST_XML = xml;
+      RAW_FINDS_ALL = parseFindsFromGpx(xml);
+
+      if(!RAW_FINDS_ALL.length){
+        setStatus('⚠️ No Found logs detected');
+        document.getElementById('subtitleLine').textContent = 'I loaded a GPX, but did not detect Found it logs. Try exporting a PQ that includes found caches with logs.';
+        return;
+      }
+
+      safeComputeAndRender();
+      setStatus('Done ✅');
+    }
+
+    // -----------------------------
+    // Events
+    // -----------------------------
+    const unitToggle = document.getElementById('unitToggle');
+    function syncUnitUI(){
+      const on = unitToggle.checked;
+      UNIT_SYSTEM = on ? 'imperial' : 'metric';
+      document.getElementById('unitLeft').style.opacity = on ? 0.75 : 1;
+      document.getElementById('unitRight').style.opacity = on ? 1 : 0.75;
+    }
+    unitToggle.addEventListener('change', ()=>{ syncUnitUI(); if(RAW_FINDS_ALL.length) safeComputeAndRender(); });
+    syncUnitUI();
+
+    document.getElementById('fileInput').addEventListener('change', async (ev)=>{
+      const file = ev.target.files && ev.target.files[0];
+      if(!file) return;
+      try{ await loadFile(file); }
+      catch(e){ console.error(e); setStatus('Error: '+(e && e.message ? e.message : e)); alert('Could not load file.\n\n'+(e && e.message ? e.message : e)); }
+    });
+
+    document.getElementById('utcOffset').addEventListener('change', ()=>{
+      if(!LAST_XML) return;
+      RAW_FINDS_ALL = parseFindsFromGpx(LAST_XML);
+      safeComputeAndRender();
+    });
+
+    document.getElementById('homeLat').addEventListener('change', ()=>{ if(RAW_FINDS_ALL.length) safeComputeAndRender(); });
+    document.getElementById('homeLon').addEventListener('change', ()=>{ if(RAW_FINDS_ALL.length) safeComputeAndRender(); });
+    document.getElementById('userName').addEventListener('change', ()=>{ if(RAW_FINDS_ALL.length) safeComputeAndRender(); });
+
+    (function initDrop(){
+      const dz = document.getElementById('dropZone');
+      const prevent = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+      ['dragenter','dragover','dragleave','drop'].forEach(ev=> dz.addEventListener(ev, prevent));
+      dz.addEventListener('dragover', ()=>{ dz.style.background='rgba(255,255,255,0.05)'; });
+      dz.addEventListener('dragleave', ()=>{ dz.style.background='rgba(255,255,255,0.03)'; });
+      dz.addEventListener('drop', async (e)=>{
+        dz.style.background='rgba(255,255,255,0.03)';
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(!file) return;
+        try{ await loadFile(file); }
+        catch(err){ console.error(err); setStatus('Error: '+(err && err.message ? err.message : err)); alert('Could not load file.\n\n'+(err && err.message ? err.message : err)); }
+      });
+    })();
+  </script>
+</body>
+</html>
