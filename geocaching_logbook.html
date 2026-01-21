@@ -341,6 +341,10 @@
       .section { padding: 18px; }
       .loader { padding: 12px; }
       .metric .v{ font-size:30px; }
+      #topDaysTable{
+       min-width: 0;
+      }
+
 
       .table {
         min-width: 520px;
@@ -875,9 +879,9 @@ function flagFromISO2(iso2){
         opt.textContent = String(y);
         sel.appendChild(opt);
       }
-      const preferred = years.includes(2025) ? 2025 : (years[years.length-1] || 2025);
-      sel.value = String(preferred);
-    }
+        const preferred = years[years.length - 1];
+        sel.value = String(preferred);
+      }
 
     function buildTitleLines(mostRecentYMD){
       const y = getSelectedYear();
@@ -1603,6 +1607,17 @@ if(logsEl){
       rerenderIfReady();
     });
     syncUnitUI();
+
+  (function initYearSelectDefault(){
+    const sel = document.getElementById('yearSelect');
+    const currentYear = new Date().getFullYear();
+
+    const opt = document.createElement('option');
+    opt.value = String(currentYear);
+    opt.textContent = String(currentYear);
+    sel.appendChild(opt);
+    sel.value = String(currentYear);
+  })();
 
     document.getElementById('utcOffset').addEventListener('change', ()=>{
       if(!LAST_XML) return;
