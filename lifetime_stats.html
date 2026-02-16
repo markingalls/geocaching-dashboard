@@ -7,6 +7,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <style>
     :root{
       --bg:#07140e;
@@ -38,7 +42,7 @@
       position:relative;
     }
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    input[type=file], input[type=text]{
+    input[type=file], input[type=text], select{
       background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.14);
       color:var(--text);
@@ -47,6 +51,7 @@
     }
     input[type=text]{width:140px;}
     input[type=text].narrow{width:118px;}
+    select{padding:9px 10px;}
     .pill{
       padding:8px 12px;border-radius:999px;
       background:rgba(34,197,94,0.12);
@@ -140,6 +145,39 @@
       .top { padding: 12px; }
       .table th, .table td{ padding: 8px 10px; }
       .table{ font-size: 13px; }
+    }
+
+    /* Map */
+    #qthMap{
+      height:560px;
+      width:100%;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.12);
+    }
+    @media (max-width: 520px){
+      #qthMap{ height:460px; }
+    }
+    .mapControls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin:8px 0 12px 0;
+    }
+    .checkboxRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .checkboxRow input[type=checkbox]{
+      width:18px;height:18px;
+      accent-color: #22c55e;
+    }
+    .leaflet-container{
+      background: rgba(0,0,0,0.18);
+      font: inherit;
     }
   </style>
 </head>
@@ -237,6 +275,44 @@
         </div>
       </div>
     </section>
+
+    <!-- QTH / Maidenhead map -->
+    <section class="section" id="qthSection">
+      <div class="title">
+        <div>
+          <h1 style="font-size:32px;margin:0;letter-spacing:-0.02em;">QTH Grid Map</h1>
+          <div class="small" id="qthSubtitle">Load a file to visualize finds per Maidenhead grid.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="mapControls">
+          <div class="pill">Grid precision</div>
+          <select id="gridPrecision" title="2/4/6 character Maidenhead grid">
+            <option value="2">2-character</option>
+            <option value="4" selected>4-character</option>
+            <option value="6">6-character</option>
+          </select>
+
+          <div class="pill">Opacity</div>
+          <span class="small" id="opacityNote">60%</span>
+
+          <div class="checkboxRow" style="margin-left:8px;">
+            <input id="toggleBlankOutlines" type="checkbox" />
+            <label for="toggleBlankOutlines" class="small" style="cursor:pointer;">
+              Show outlines for blank grids (current view)
+            </label>
+          </div>
+
+          <div class="small" id="gridNote" style="margin-left:auto;">
+            Filled grids are shaded by finds; outlines are thin black.
+          </div>
+        </div>
+
+        <div id="qthMap" aria-label="Map of QTH grids"></div>
+        <div class="small" style="margin-top:10px;" id="qthStatus">—</div>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -321,6 +397,26 @@
       return d;
     }
 
+    // Wrap a longitude so it is the closest equivalent to a reference longitude.
+    // Example: lon=-160, ref=180  => 200 (Alaska draws next to Japan in a dateline-centered view)
+    function wrapLonToRef(lon, refLon){
+      let d = lon - refLon;
+      d = ((d + 540) % 360) - 180;   // now in [-180,180)
+      return refLon + d;
+    }
+
+    // Circular mean longitude in degrees (handles dateline correctly)
+    function circularMeanLon(lons){
+      if(!lons || !lons.length) return 0;
+      let x = 0, y = 0;
+      for(const lon of lons){
+        const r = lon * Math.PI / 180;
+        x += Math.cos(r);
+        y += Math.sin(r);
+      }
+      return Math.atan2(y, x) * 180 / Math.PI; // [-180,180]
+    }
+
     let UNIT_SYSTEM = 'metric';
     function fmtDistance(meters){
       if(!Number.isFinite(meters)) return '—';
@@ -392,7 +488,7 @@
     }
 
     // Country flags
-    const ISO2_CODES = ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "EU", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "UN", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "XK", "YE", "YT", "ZA", "ZM", "ZW"];
+    const ISO2_CODES = ["AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ","BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BV","BW","BY","BZ","CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY","CZ","DE","DJ","DK","DM","DO","DZ","EC","EE","EG","EH","ER","ES","ET","EU","FI","FJ","FK","FM","FO","FR","GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GS","GT","GU","GW","GY","HK","HM","HN","HR","HT","HU","ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT","JE","JM","JO","JP","KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ","LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY","MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ","NA","NC","NE","NF","NG","NI","NL","NO","NP","NR","NU","NZ","OM","PA","PE","PF","PG","PH","PK","PL","PM","PN","PR","PS","PT","PW","PY","QA","RE","RO","RS","RU","RW","SA","SB","SC","SD","SE","SG","SH","SI","SJ","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ","TC","TD","TF","TG","TH","TJ","TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ","UA","UG","UM","UN","US","UY","UZ","VA","VC","VE","VG","VI","VN","VU","WF","WS","XK","YE","YT","ZA","ZM","ZW"];
     const ISO2_BY_COUNTRY = (function(){
       const norm = s => String(s||'').trim().toLowerCase().replace(/[\u2019']/g,"'").replace(/[^a-z0-9]+/g,' ').trim();
       const map = Object.create(null);
@@ -497,10 +593,50 @@
       adjLon = adjLon % 2;
       adjLat = adjLat % 1;
 
-      const subsLon = Math.floor(adjLon * 12);
-      const subsLat = Math.floor(adjLat * 24);
+      // Subsquare: lon 2° split into 24 => 1/12° (A..X), lat 1° split into 24 => 1/24° (A..X)
+      const subsLon = Math.floor(adjLon * 12); // 0..23
+      const subsLat = Math.floor(adjLat * 24); // 0..23
       locator += String.fromCharCode(A + subsLon) + String.fromCharCode(A + subsLat);
       return locator;
+    }
+
+    // Maidenhead bounds for 2/4/6 character locators
+    function maidenheadBounds(locatorRaw){
+      const loc = String(locatorRaw||'').trim();
+      if(!loc) return null;
+      const s = loc.toUpperCase();
+      if(!(s.length===2 || s.length===4 || s.length===6)) return null;
+
+      const A = 'A'.charCodeAt(0);
+      const c0 = s.charCodeAt(0), c1 = s.charCodeAt(1);
+      if(c0 < A || c0 > A+17 || c1 < A || c1 > A+17) return null;
+
+      let west = (c0 - A) * 20 - 180;
+      let south = (c1 - A) * 10 - 90;
+      let w = 20, h = 10;
+
+      if(s.length >= 4){
+        const d0 = s.charCodeAt(2), d1 = s.charCodeAt(3);
+        if(d0 < 48 || d0 > 57 || d1 < 48 || d1 > 57) return null;
+        const x = d0 - 48; // 0-9
+        const y = d1 - 48; // 0-9
+        west += x * 2;
+        south += y * 1;
+        w = 2; h = 1;
+      }
+
+      if(s.length >= 6){
+        const e0 = s.charCodeAt(4), e1 = s.charCodeAt(5);
+        // Subsquares are A..X (24)
+        if(e0 < A || e0 > A+23 || e1 < A || e1 > A+23) return null;
+        const x = e0 - A; // 0-23
+        const y = e1 - A; // 0-23
+        west += x * (2/24);   // 2° / 24 = 1/12°
+        south += y * (1/24);  // 1° / 24 = 1/24°
+        w = 2/24; h = 1/24;
+      }
+
+      return { south, west, north: south + h, east: west + w };
     }
 
     function sphericalWeiszfeldMedian(latLonList){
@@ -534,10 +670,9 @@
       for(const u of vecs){ v[0]+=u[0]; v[1]+=u[1]; v[2]+=u[2]; }
       v = norm(v);
 
-      for(let iter=0; iter<80; iter++){ 
+      for(let iter=0; iter<80; iter++){
         let sum = [0,0,0];
         let wsum = 0;
-        let maxMove = 0;
 
         for(const u of vecs){
           const d = ang(v,u);
@@ -546,11 +681,270 @@
           wsum += w;
         }
         const v2 = norm([sum[0]/wsum, sum[1]/wsum, sum[2]/wsum]);
-        maxMove = ang(v, v2);
+        const move = ang(v, v2);
         v = v2;
-        if(maxMove < 1e-10) break;
+        if(move < 1e-10) break;
       }
       return toLatLon(v);
+    }
+
+    // -----------------------------
+    // QTH Map (Leaflet)
+    // -----------------------------
+    let MAP = null;
+    let QTH_LAYER = null;         // filled grids with finds
+    let QTH_BLANK_LAYER = null;   // outlines for blank grids in current view
+    let QTH_LAST_FIT = false;
+
+    const QTH_FILL_OPACITY = 0.60;
+
+    function qthColorForCount(count){
+      const n = count|0;
+      if(n <= 0) return null;
+      if(n <= 4) return '#fbfbb9';
+      if(n <= 9) return '#d4f1a1';
+      if(n <= 24) return '#b0d8a7';
+      if(n <= 49) return '#7fcdbb';
+      if(n <= 74) return '#41b6c4';
+      if(n <= 99) return '#1d91c0';
+      if(n <= 249) return '#225ea8';
+      if(n <= 499) return '#253494';
+      if(n <= 999) return '#081d58';
+      return '#000000';
+    }
+
+    function initMap(){
+      if(MAP) return;
+
+      MAP = L.map('qthMap', {
+        worldCopyJump: true,
+        preferCanvas: true
+      });
+
+      // Base tiles (CartoDB Positron)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }).addTo(MAP);
+
+      QTH_LAYER = L.layerGroup().addTo(MAP);
+      QTH_BLANK_LAYER = L.layerGroup().addTo(MAP);
+
+      MAP.setView([20,0], 2);
+
+      // Rebuild blank outlines when the map moves/zooms (only if enabled)
+      MAP.on('moveend zoomend', ()=>{
+        if(document.getElementById('toggleBlankOutlines').checked){
+          rebuildBlankOutlines();
+        }
+      });
+
+      // UI hooks
+      document.getElementById('gridPrecision').addEventListener('change', ()=>{
+        if(RAW_FINDS_ALL.length) updateQthMap(true);
+      });
+      document.getElementById('toggleBlankOutlines').addEventListener('change', ()=>{
+        if(RAW_FINDS_ALL.length) updateQthMap(false);
+      });
+
+      document.getElementById('opacityNote').textContent = Math.round(QTH_FILL_OPACITY*100) + '%';
+    }
+
+    function setQthStatus(msg){
+      document.getElementById('qthStatus').textContent = msg;
+    }
+
+    function locatedFinds(){
+      return RAW_FINDS_ALL.filter(f => Number.isFinite(f.lat) && Number.isFinite(f.lon) && !isLocationlessType(f.cacheType));
+    }
+
+    function updateQthMap(forceFit){
+      initMap();
+      QTH_LAYER.clearLayers();
+      QTH_BLANK_LAYER.clearLayers();
+
+      const located = locatedFinds();
+      if(!located.length){
+        setQthStatus('No mappable coordinates found (locationless caches are excluded).');
+        document.getElementById('qthSubtitle').textContent = 'Loaded file, but no usable coordinates to map.';
+        return;
+      }
+
+      const prec = parseInt(document.getElementById('gridPrecision').value, 10) || 4;
+
+      // Count finds per grid
+      const counts = new Map();
+      for(const f of located){
+        const g = maidenhead(f.lat, f.lon, prec);
+        if(!g) continue;
+        counts.set(g, (counts.get(g)||0) + 1);
+      }
+
+      // Build polygons for grids with finds (wrap to current view so dateline works)
+      let polys = 0;
+      const refLon = MAP.getCenter().lng;
+
+      for(const [grid, count] of counts.entries()){
+        const b = maidenheadBounds(grid);
+        if(!b) continue;
+
+        const fill = qthColorForCount(count);
+
+        const w = wrapLonToRef(b.west, refLon);
+        const e = wrapLonToRef(b.east, refLon);
+
+        const latlngs = [
+          [b.south, w],
+          [b.south, e],
+          [b.north, e],
+          [b.north, w]
+        ];
+
+        const poly = L.polygon(latlngs, {
+          color: '#000000',
+          weight: 1,
+          opacity: 1,
+          fill: !!fill,
+          fillColor: fill || undefined,
+          fillOpacity: fill ? QTH_FILL_OPACITY : 0
+        });
+
+        poly.bindTooltip(
+          `<div style="font-weight:900;margin-bottom:2px;">${escapeHtml(grid)}</div>` +
+          `<div>${fmtInt(count)} find${count===1?'':'s'}</div>`,
+          { sticky:true, direction:'top', opacity:0.95 }
+        );
+
+        poly.addTo(QTH_LAYER);
+        polys++;
+      }
+
+      const uniq = counts.size;
+      setQthStatus(`${fmtInt(located.length)} located finds • ${fmtInt(uniq)} unique ${prec}-character grids • ${fmtInt(polys)} polygons rendered`);
+      document.getElementById('qthSubtitle').innerHTML =
+        `Showing <b>${prec}-character</b> Maidenhead (QTH) grids with finds.`;
+
+      // Fit to data once (or when forced) — dateline-aware fit using circular mean lon
+      if(forceFit || !QTH_LAST_FIT){
+        const meanLon = circularMeanLon(located.map(p => p.lon));
+        const bounds = L.latLngBounds([]);
+        for(const f of located){
+          bounds.extend([f.lat, wrapLonToRef(f.lon, meanLon)]);
+        }
+        if(bounds.isValid()){
+          MAP.fitBounds(bounds.pad(0.10), { animate: false });
+          QTH_LAST_FIT = true;
+        }
+      }
+
+      // Optional blank outlines in view
+      if(document.getElementById('toggleBlankOutlines').checked){
+        rebuildBlankOutlines(counts);
+      }
+    }
+
+    function gridStepDegrees(prec){
+      // Returns {dLat, dLon} cell size for the chosen precision
+      if(prec === 2) return { dLat: 10, dLon: 20 };
+      if(prec === 4) return { dLat: 1, dLon: 2 };
+      // prec === 6
+      return { dLat: 1/24, dLon: 1/12 };
+    }
+
+    function rebuildBlankOutlines(existingCounts){
+      if(!MAP) return;
+      QTH_BLANK_LAYER.clearLayers();
+
+      const prec = parseInt(document.getElementById('gridPrecision').value, 10) || 4;
+      const counts = existingCounts || (() => {
+        const located = locatedFinds();
+        const m = new Map();
+        for(const f of located){
+          const g = maidenhead(f.lat, f.lon, prec);
+          if(!g) continue;
+          m.set(g, (m.get(g)||0) + 1);
+        }
+        return m;
+      })();
+
+      const refLon = MAP.getCenter().lng;
+      const b = MAP.getBounds();
+      let south = Math.max(-90, b.getSouth());
+      let north = Math.min(90, b.getNorth());
+      let west = b.getWest();
+      let east = b.getEast();
+
+      // Handle dateline wrap: split into up to two ranges
+      const ranges = [];
+      if(east < west){
+        ranges.push({ west: west, east: 180 });
+        ranges.push({ west: -180, east: east });
+      } else {
+        ranges.push({ west, east });
+      }
+
+      const step = gridStepDegrees(prec);
+      const dLat = step.dLat, dLon = step.dLon;
+
+      // Expand a hair so outlines don't "pop" at edges
+      south = Math.max(-90, south - dLat);
+      north = Math.min(90, north + dLat);
+
+      function floorToStep(x, step){
+        return Math.floor(x / step) * step;
+      }
+
+      // Safety limit to avoid melting the browser at very low zoom with 6-char grids
+      const MAX_CELLS = 5000;
+      let cellCount = 0;
+      let drawn = 0;
+
+      for(const r of ranges){
+        let w0 = r.west, e0 = r.east;
+        // clamp into [-180,180]
+        w0 = Math.max(-180, Math.min(180, w0));
+        e0 = Math.max(-180, Math.min(180, e0));
+
+        let lat0 = floorToStep(south + 90, dLat) - 90;
+        for(let lat = lat0; lat < north; lat += dLat){
+          let lon0 = floorToStep(w0 + 180, dLon) - 180;
+          for(let lon = lon0; lon < e0; lon += dLon){
+            cellCount++;
+            if(cellCount > MAX_CELLS){
+              setQthStatus(`(Blank outlines paused) Too many grids in view at ${prec}-char. Zoom in to show blank outlines.`);
+              return;
+            }
+
+            // Use cell center to compute its grid id, then skip if it has finds
+            const centerLat = lat + dLat/2;
+            const centerLon = lon + dLon/2;
+            const grid = maidenhead(centerLat, centerLon, prec);
+            if(grid && counts.has(grid)) continue;
+
+            const w = wrapLonToRef(lon, refLon);
+            const e = wrapLonToRef(lon + dLon, refLon);
+
+            const latlngs = [
+              [lat, w],
+              [lat, e],
+              [lat + dLat, e],
+              [lat + dLat, w]
+            ];
+
+            L.polygon(latlngs, {
+              color: '#000000',
+              weight: 1,
+              opacity: 1,
+              fill: false
+            }).addTo(QTH_BLANK_LAYER);
+            drawn++;
+          }
+        }
+      }
+
+      // Keep the main status line; add a short hint if outlines are active
+      const base = document.getElementById('qthStatus').textContent;
+      document.getElementById('qthStatus').textContent = base + ` • blank outlines: ${fmtInt(drawn)} in view`;
     }
 
     // -----------------------------
@@ -624,7 +1018,7 @@
       const dates = Array.from(daysSet).sort();
       let bestLen = dates.length ? 1 : 0, bestStart = dates[0]||'—', bestEnd = dates[0]||'—';
       let curLen = dates.length ? 1 : 0, curStart = dates[0]||'—';
-      for(let i=1;i<dates.length;i++){ 
+      for(let i=1;i<dates.length;i++){
         const prev = dates[i-1], cur = dates[i];
         if(dayNumFromYMD(cur) === dayNumFromYMD(prev) + 1) curLen += 1;
         else {
@@ -655,7 +1049,7 @@
         if(c) byDayCountries.get(d).add(c);
       }
       let mostCountries = null;
-      for(const [d,set] of byDayCountries.entries()){ 
+      for(const [d,set] of byDayCountries.entries()){
         const n = set.size;
         if(!mostCountries || n > mostCountries.count) mostCountries = {date:d, count:n, countries:Array.from(set)};
       }
@@ -667,7 +1061,7 @@
       function fastestWindow(n){
         if(total < n) return null;
         let best = null;
-        for(let i=0; i+n-1<total; i++){ 
+        for(let i=0; i+n-1<total; i++){
           const a = all[i], b = all[i+n-1];
           const days = (dayNumFromYMD(b.ymd) - dayNumFromYMD(a.ymd)) + 1;
           if(!best || days < best.days) best = {days, start:a.ymd, end:b.ymd};
@@ -688,7 +1082,7 @@
       const byDayLocated = new Map();
       for(const f of located){ if(!byDayLocated.has(f.ymd)) byDayLocated.set(f.ymd, []); byDayLocated.get(f.ymd).push(f); }
       let bigDayDist = null;
-      for(const [d,list] of byDayLocated.entries()){ 
+      for(const [d,list] of byDayLocated.entries()){
         list.sort((a,b)=>(a.timeMs??0)-(b.timeMs??0));
         let meters = 0;
         for(let i=1;i<list.length;i++) meters += haversineMeters(list[i-1].lat, list[i-1].lon, list[i].lat, list[i].lon);
@@ -745,6 +1139,9 @@
       setCell('v_qth2', `${fmtInt(grids2.size)} out of ${fmtInt(total2)} (${pct(grids2.size,total2,0)}%)`);
       setCell('v_qth4', `${fmtInt(grids4.size)} out of ${fmtInt(total4)} (${pct(grids4.size,total4,1)}%)`);
       setCell('v_qth6', `${fmtInt(grids6.size)} out of ${fmtInt(total6)} (${pct(grids6.size,total6,1)}%)`);
+
+      // Update map after computing stats
+      updateQthMap(!QTH_LAST_FIT);
     }
 
     // -----------------------------
@@ -861,6 +1258,8 @@
       if(!RAW_FINDS_ALL.length){
         setStatus('⚠️ No Found logs detected');
         document.getElementById('subtitleLine').textContent = 'I loaded a GPX, but did not detect Found it logs. Try exporting a PQ that includes found caches with logs.';
+        document.getElementById('qthSubtitle').textContent = 'I loaded a GPX, but did not detect Found it logs.';
+        setQthStatus('—');
         return;
       }
 
@@ -912,6 +1311,10 @@
         catch(err){ console.error(err); setStatus('Error: '+(err && err.message ? err.message : err)); alert('Could not load file.\n\n'+(err && err.message ? err.message : err)); }
       });
     })();
+
+    // Initialize map early so it renders even before data (optional)
+    initMap();
+    setQthStatus('Load a file to render QTH grids.');
   </script>
 </body>
 </html>
