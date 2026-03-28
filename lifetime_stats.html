@@ -940,7 +940,7 @@
       }
 
       // Keep the main status line; add a short hint if outlines are active
-      const base = document.getElementById('qthStatus').textContent;
+      const base = document.getElementById('qthStatus').textContent.split('•')[0].trim();
       document.getElementById('qthStatus').textContent = base + ` • blank outlines: ${fmtInt(drawn)} in view`;
     }
 
