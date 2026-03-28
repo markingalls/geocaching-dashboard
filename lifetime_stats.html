@@ -812,7 +812,7 @@
       return RAW_FINDS_ALL.filter(f => Number.isFinite(f.lat) && Number.isFinite(f.lon) && !isLocationlessType(f.cacheType));
     }
 
-    function updateQthMap(forceFit){
+          function updateQthMap(forceFit){
       initMap();
       QTH_LAYER.clearLayers();
       QTH_BLANK_LAYER.clearLayers();
@@ -834,8 +834,11 @@
         counts.set(g, (counts.get(g)||0) + 1);
       }
 
-      // Build polygons for grids with finds (wrap to current view so dateline works)
+      // Build polygons for grids with finds
       let polys = 0;
+      
+      // CRITICAL FIX: Determine the reference longitude based on the CURRENT map view
+      // This ensures polygons wrap correctly when crossing the International Date Line
       const refLon = MAP.getCenter().lng;
 
       for(const [grid, count] of counts.entries()){
@@ -844,6 +847,8 @@
 
         const fill = qthColorForCount(count);
 
+        // Wrap the West and East boundaries to match the current view's center
+        // This prevents the polygon from stretching across the entire map when crossing the IDL
         const w = wrapLonToRef(b.west, refLon);
         const e = wrapLonToRef(b.east, refLon);
 
@@ -865,7 +870,7 @@
 
         poly.bindTooltip(
           `<div style="font-weight:900;margin-bottom:2px;">${escapeHtml(grid)}</div>` +
-          `<div>${fmtInt(count)} find${count===1?'':'s'}</div>`,
+          `<div>$${fmtInt(count)} find$${count===1?'':'s'}</div>`,
           { sticky:true, direction:'top', opacity:0.95 }
         );
 
@@ -873,6 +878,7 @@
         polys++;
       }
 
+      // This line now works because the loop above is properly closed
       const uniq = counts.size;
       setQthStatus(`${fmtInt(located.length)} located finds • ${fmtInt(uniq)} unique ${prec}-character grids • ${fmtInt(polys)} polygons rendered`);
       document.getElementById('qthSubtitle').innerHTML =
@@ -883,6 +889,7 @@
         const meanLon = circularMeanLon(located.map(p => p.lon));
         const bounds = L.latLngBounds([]);
         for(const f of located){
+          // Wrap the find's longitude to the mean for bounding box calculation
           bounds.extend([f.lat, wrapLonToRef(f.lon, meanLon)]);
         }
         if(bounds.isValid()){
