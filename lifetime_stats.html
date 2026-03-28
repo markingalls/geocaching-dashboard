@@ -250,6 +250,16 @@
             <option value="6">6-character</option>
           </select>
 
+          <div class="pill">Base Map</div>
+          <select id="mapLayerSelect" title="Choose a background map">
+            <option value="carto-light" selected>Light (Default)</option>
+            <option value="carto-dark">Dark Matter</option>
+            <option value="osm">OpenStreetMap</option>
+            <option value="positron">Positron (Light)</option>
+            <option value="voyager">Voyager (Light)</option>
+            <option value="satellite">Esri Satellite</option>
+          </select>
+
           <div class="checkboxRow" style="margin-left:8px;">
             <input id="toggleBlankOutlines" type="checkbox" />
             <label for="toggleBlankOutlines" class="small" style="cursor:pointer;">
@@ -718,11 +728,39 @@
         preferCanvas: true
       });
 
-      // Base tiles (CartoDB Positron)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-      }).addTo(MAP);
+      // Define available tile layers
+      const tileLayers = {
+        'carto-light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }),
+        'carto-dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }),
+        'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }),
+        'positron': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }),
+        'voyager': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }),
+        'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        })
+      };
+
+      // Add the default layer (Light)
+      tileLayers['carto-light'].addTo(MAP);
+
+      // Store the layers object so we can access it later for switching
+      MAP._tileLayers = tileLayers;
 
       QTH_LAYER = L.layerGroup().addTo(MAP);
       QTH_BLANK_LAYER = L.layerGroup().addTo(MAP);
@@ -740,8 +778,27 @@
       document.getElementById('gridPrecision').addEventListener('change', ()=>{
         if(RAW_FINDS_ALL.length) updateQthMap(true);
       });
+      
       document.getElementById('toggleBlankOutlines').addEventListener('change', ()=>{
         if(RAW_FINDS_ALL.length) updateQthMap(false);
+      });
+
+      // NEW: Listener for the Map Layer Dropdown
+      document.getElementById('mapLayerSelect').addEventListener('change', (e) => {
+        const selectedKey = e.target.value;
+        const layers = MAP._tileLayers;
+        
+        if (layers && layers[selectedKey]) {
+          // Remove all existing tile layers from the map
+          MAP.eachLayer((layer) => {
+            if (layer instanceof L.TileLayer) {
+              MAP.removeLayer(layer);
+            }
+          });
+          
+          // Add the newly selected layer
+          layers[selectedKey].addTo(MAP);
+        }
       });
 
       document.getElementById('opacityNote').textContent = Math.round(QTH_FILL_OPACITY*100) + '%';
