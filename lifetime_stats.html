@@ -232,6 +232,41 @@
       </div>
     </div>
 
+    <!-- QTH / Maidenhead map -->
+    <section class="section" id="qthSection">
+      <div class="title">
+        <div>
+          <h1 style="font-size:32px;margin:0;letter-spacing:-0.02em;">QTH Grid Map</h1>
+          <div class="small" id="qthSubtitle">Load a file to visualize finds per Maidenhead grid.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="mapControls">
+          <div class="pill">Grid precision</div>
+          <select id="gridPrecision" title="2/4/6 character Maidenhead grid">
+            <option value="2">2-character</option>
+            <option value="4" selected>4-character</option>
+            <option value="6">6-character</option>
+          </select>
+
+          <div class="checkboxRow" style="margin-left:8px;">
+            <input id="toggleBlankOutlines" type="checkbox" />
+            <label for="toggleBlankOutlines" class="small" style="cursor:pointer;">
+              Show outlines for blank grids (current view)
+            </label>
+          </div>
+
+          <div class="small" id="gridNote" style="margin-left:auto;">
+            Filled grids are shaded by finds; outlines are thin black.
+          </div>
+        </div>
+
+        <div id="qthMap" aria-label="Map of QTH grids"></div>
+        <div class="small" style="margin-top:10px;" id="qthStatus">—</div>
+      </div>
+    </section>
+
     <section class="section" id="statsSection">
       <div class="title">
         <div>
@@ -273,44 +308,6 @@
           </table>
           <div class="small" style="margin-top:10px;">Dates are shown in <b>YYYY-MM-DD</b> unless otherwise stated.</div>
         </div>
-      </div>
-    </section>
-
-    <!-- QTH / Maidenhead map -->
-    <section class="section" id="qthSection">
-      <div class="title">
-        <div>
-          <h1 style="font-size:32px;margin:0;letter-spacing:-0.02em;">QTH Grid Map</h1>
-          <div class="small" id="qthSubtitle">Load a file to visualize finds per Maidenhead grid.</div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:16px;">
-        <div class="mapControls">
-          <div class="pill">Grid precision</div>
-          <select id="gridPrecision" title="2/4/6 character Maidenhead grid">
-            <option value="2">2-character</option>
-            <option value="4" selected>4-character</option>
-            <option value="6">6-character</option>
-          </select>
-
-          <div class="pill">Opacity</div>
-          <span class="small" id="opacityNote">60%</span>
-
-          <div class="checkboxRow" style="margin-left:8px;">
-            <input id="toggleBlankOutlines" type="checkbox" />
-            <label for="toggleBlankOutlines" class="small" style="cursor:pointer;">
-              Show outlines for blank grids (current view)
-            </label>
-          </div>
-
-          <div class="small" id="gridNote" style="margin-left:auto;">
-            Filled grids are shaded by finds; outlines are thin black.
-          </div>
-        </div>
-
-        <div id="qthMap" aria-label="Map of QTH grids"></div>
-        <div class="small" style="margin-top:10px;" id="qthStatus">—</div>
       </div>
     </section>
   </div>
@@ -1136,9 +1133,9 @@
       const total6 = total4*24*24;
       const pct = (a,b,dec)=> b ? (100*a/b).toFixed(dec) : '0';
 
-      setCell('v_qth2', `${fmtInt(grids2.size)} out of ${fmtInt(total2)} (${pct(grids2.size,total2,0)}%)`);
-      setCell('v_qth4', `${fmtInt(grids4.size)} out of ${fmtInt(total4)} (${pct(grids4.size,total4,1)}%)`);
-      setCell('v_qth6', `${fmtInt(grids6.size)} out of ${fmtInt(total6)} (${pct(grids6.size,total6,1)}%)`);
+      setCell('v_qth2', `${fmtInt(grids2.size)} out of ${fmtInt(total2)} (${pct(grids2.size,total2,1)}%)`);
+      setCell('v_qth4', `${fmtInt(grids4.size)} out of ${fmtInt(total4)} (${pct(grids4.size,total4,2)}%)`);
+      setCell('v_qth6', `${fmtInt(grids6.size)} out of ${fmtInt(total6)} (${pct(grids6.size,total6,3)}%)`);
 
       // Update map after computing stats
       updateQthMap(!QTH_LAST_FIT);
